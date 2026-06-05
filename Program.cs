@@ -475,47 +475,43 @@ namespace CalkanGsmWeb
             StartServer(port);
         }
 
-    private static void StartServer(string port)
+   private static void StartServer(string port)
 {
-    // Railway'de prefix çakışmasını engellemek için tek bir tanımlama yapıyoruz
     string url = $"http://+:{port}/"; 
+    HttpListener listener = new HttpListener();
     
-    // Uygulama kapanmasın diye tüm dinleme sürecini sarmaladık
     try
     {
-        HttpListener listener = new HttpListener();
         listener.Prefixes.Add(url);
         listener.Start();
-        
         Console.WriteLine($"✅ Sunucu {url} adresinde yayında!");
 
         while (true)
         {
             try
             {
-                // İstek gelmesini bekle
                 HttpListenerContext context = listener.GetContext();
-                
-                // İsteği anında başka bir iş parçacığına devret (bloklamayı önle)
                 ThreadPool.QueueUserWorkItem(state =>
                 {
-                    try {
-                        // SENİN ORİJİNAL İSTEK İŞLEME KODUN BURAYA GELECEK
-                        // HttpListenerRequest request = context.Request; vb...
+                    HttpListenerContext ctx = (HttpListenerContext)state;
+                    try 
+                    {
+                        // --- SENİN İSTEK İŞLEME KODLARINI BURAYA YAPIŞTIR ---
+                        // (Örn: request al, yanıt ver vb.)
                     }
-                    catch { /* İşlem hatalarını yut */ }
-                    finally { context.Response.Close(); }
+                    catch (Exception ex) { Console.WriteLine("İşlem hatası: " + ex.Message); }
+                    finally { ctx.Response.Close(); }
                 }, context);
             }
-            catch (HttpListenerException) { continue; } // Railway'in "dürtmelerini" yut
+            catch (HttpListenerException) { continue; } 
             catch (Exception) { continue; }
         }
     }
     catch (Exception ex)
     {
-        // Eğer sunucu hiç başlamazsa hatayı buraya yazdır
         Console.WriteLine($"❌ KRİTİK BAŞLATMA HATASI: {ex.Message}");
     }
+ } // <--- StartServer metodunun kapanışı (1. parantez)
         while (true)
         {
             if (Interlocked.Increment(ref activeConnections) > MAX_CONNECTIONS)
