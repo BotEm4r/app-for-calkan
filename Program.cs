@@ -475,50 +475,25 @@ namespace CalkanGsmWeb
             StartServer(port);
         }
 
-   private static void StartServer(string port)
-{
-    string url = $"http://+:{port}/"; 
-    HttpListener listener = new HttpListener();
-    
-    try
-    {
-        listener.Prefixes.Add(url);
-        listener.Start();
-        Console.WriteLine($"✅ Sunucu {url} adresinde yayında!");
-
-        while (true)
+        private static void StartServer(string port)
         {
+            HttpListener listener = new HttpListener();
+            // BULUTTA HER YERDEN ERİŞİLEBİLMESİ İÇİN LOCALHOST YERİNE * YAPTIK
+            listener.Prefixes.Add($"http://*:{port}/");
+            
             try
             {
-                HttpListenerContext context = listener.GetContext();
-                ThreadPool.QueueUserWorkItem(state =>
+                listener.Start();
+                Console.WriteLine($"🚀 Web Sunucusu Başarıyla Başlatıldı! Port: {port}");
+
+                while (true)
                 {
-                    HttpListenerContext ctx = (HttpListenerContext)state;
-                    try 
+                    if (Interlocked.Increment(ref activeConnections) > MAX_CONNECTIONS)
                     {
-                        // --- SENİN İSTEK İŞLEME KODLARINI BURAYA YAPIŞTIR ---
-                        // (Örn: request al, yanıt ver vb.)
+                        Interlocked.Decrement(ref activeConnections);
+                        continue;
                     }
-                    catch (Exception ex) { Console.WriteLine("İşlem hatası: " + ex.Message); }
-                    finally { ctx.Response.Close(); }
-                }, context);
-            }
-            catch (HttpListenerException) { continue; } 
-            catch (Exception) { continue; }
-        }
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"❌ KRİTİK BAŞLATMA HATASI: {ex.Message}");
-    }
- } // <--- StartServer metodunun kapanışı (1. parantez)
-        while (true)
-        {
-            if (Interlocked.Increment(ref activeConnections) > MAX_CONNECTIONS)
-            {
-                Interlocked.Decrement(ref activeConnections);
-                continue;
-            }
+
                     HttpListenerContext context = listener.GetContext();
                     ThreadPool.QueueUserWorkItem(_ => 
                     {
