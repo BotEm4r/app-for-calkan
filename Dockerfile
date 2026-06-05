@@ -14,8 +14,6 @@ FROM mcr.microsoft.com/dotnet/runtime:8.0
 WORKDIR /app
 COPY --from=build /app/out .
 
-# Railway'in atadığı port üzerinden dinleyecek
-ENV PORT=8080
-EXPOSE 8080
-
-ENTRYPOINT ["dotnet", "app-for-calkan.dll"]
+# --- DLL İSMİ PROBLEMİNİ ÇÖZEN AKILLI BAŞLATICI ---
+# Klasördeki ana .runtimeconfig.json dosyasından projenin adını otomatik bulup çalıştırır.
+ENTRYPOINT ["sh", "-c", "dll_name=$(ls *.runtimeconfig.json | sed 's/\\.runtimeconfig\\.json//'); exec dotnet \"$dll_name.dll\""]
