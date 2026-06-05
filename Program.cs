@@ -476,28 +476,36 @@ namespace CalkanGsmWeb
         }
 
     private static void StartServer(string port)
-    {
+{
     HttpListener listener = new HttpListener();
-    
-    // Sadece işletim sistemine göre tek bir adres tanımla
-    if (OperatingSystem.IsWindows())
-    {
-        listener.Prefixes.Add($"http://localhost:{port}/");
-        Console.WriteLine($"[YERELE ÖZEL] Local test modu: http://localhost:{port}/");
-    }
-    else
-    {
-        // Railway (Linux) için * yerine 0.0.0.0 kullanmak daha garantidir
-        // Yanlış: listener.Prefixes.Add($"http://8.8.8.8:{port}/");
-// DOĞRUSU:
-        listener.Prefixes.Add($"http://0.0.0.0:{port}/");
-        Console.WriteLine($"🚀 Sunucu {port} portunda yayında!");
-    }
-    
+
+    // Linux (Railway) ise + kullan, Windows ise localhost kullan.
+    // + operatörü, o porttaki tüm yerel IP'leri (0.0.0.0 dahil) kapsar ve Railway için standarttır.
+    string prefix = OperatingSystem.IsWindows() ? $"http://localhost:{port}/" : $"http://+:{port}/";
+    listener.Prefixes.Add(prefix);
+
     try
     {
+        // Windows'ta çalışıyorsak ve yetki hatası alırsak diye küçük bir hatırlatma
+        if (OperatingSystem.IsWindows())
+        {
+            Console.WriteLine($"[BİLGİ] Windows'ta admin yetkisi gerekebilir. Eğer hata alırsan terminali yönetici olarak çalıştır.");
+        }
+
         listener.Start();
-        // ... (while döngün burada devam etsin)
+        Console.WriteLine($"🚀 Sunucu {prefix} adresinde başlatıldı!");
+
+        // ... (while döngün ve try-catch bloğun buraya aynen gelecek) ...
+    }
+    catch (HttpListenerException ex) when (ex.ErrorCode == 5)
+    {
+        Console.WriteLine("❌ HATA: Admin yetkisi gerekiyor! Terminali yönetici olarak aç.");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"❌ Sunucu başlatılamadı: {ex.Message}");
+    }
+}
         while (true)
         {
             if (Interlocked.Increment(ref activeConnections) > MAX_CONNECTIONS)
