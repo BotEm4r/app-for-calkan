@@ -18,4 +18,4 @@ COPY --from=build /app/out .
 ENV PORT=8080
 EXPOSE 8080
 
-ENTRYPOINT ["dotnet", "CalkanGsmWeb.dll"]
+ENTRYPOINT ["dotnet", "app-for-calkan.dll"]
