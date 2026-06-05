@@ -1,19 +1,21 @@
-# Windows tabanlı bir .NET 8.0 SDK imajı kullanıyoruz
-FROM mcr.microsoft.com/dotnet/sdk:8.0-windowsservercore-ltsc2022 AS build
-WORKDIR /src
-
-# Proje dosyalarını kopyala
-COPY ["CalkanGsmWeb.csproj", "./"]
-RUN dotnet restore "CalkanGsmWeb.csproj"
-
-# Tüm kaynak kodları kopyala ve yayınla (publish)
-COPY . .
-RUN dotnet publish "CalkanGsmWeb.csproj" -c Release -o /app/publish
-
-# Çalışma zamanı imajı
-FROM mcr.microsoft.com/dotnet/runtime:8.0-windowsservercore-ltsc2022 AS final
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /app
-COPY --from=build /app/publish .
 
-# Uygulamayı başlat
-ENTRYPOINT ["CalkanGsmWeb.exe"]
+# Proje dosyalarını kopyala ve restore et
+COPY *.csproj ./
+RUN dotnet restore
+
+# Diğer her şeyi kopyala ve derle
+COPY . ./
+RUN dotnet publish -c Release -o out
+
+# Çalıştırma aşaması
+FROM mcr.microsoft.com/dotnet/runtime:8.0
+WORKDIR /app
+COPY --from=build /app/out .
+
+# Railway'in atadığı port üzerinden dinleyecek
+ENV PORT=8080
+EXPOSE 8080
+
+ENTRYPOINT ["dotnet", "CalkanGsmWeb.dll"]
