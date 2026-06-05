@@ -477,33 +477,44 @@ namespace CalkanGsmWeb
 
     private static void StartServer(string port)
 {
-    HttpListener listener = new HttpListener();
-
-    // Linux (Railway) ise + kullan, Windows ise localhost kullan.
-    // + operatörü, o porttaki tüm yerel IP'leri (0.0.0.0 dahil) kapsar ve Railway için standarttır.
-    string prefix = OperatingSystem.IsWindows() ? $"http://localhost:{port}/" : $"http://+:{port}/";
-    listener.Prefixes.Add(prefix);
-
+    // Railway'de prefix çakışmasını engellemek için tek bir tanımlama yapıyoruz
+    string url = $"http://+:{port}/"; 
+    
+    // Uygulama kapanmasın diye tüm dinleme sürecini sarmaladık
     try
     {
-        // Windows'ta çalışıyorsak ve yetki hatası alırsak diye küçük bir hatırlatma
-        if (OperatingSystem.IsWindows())
-        {
-            Console.WriteLine($"[BİLGİ] Windows'ta admin yetkisi gerekebilir. Eğer hata alırsan terminali yönetici olarak çalıştır.");
-        }
-
+        HttpListener listener = new HttpListener();
+        listener.Prefixes.Add(url);
         listener.Start();
-        Console.WriteLine($"🚀 Sunucu {prefix} adresinde başlatıldı!");
+        
+        Console.WriteLine($"✅ Sunucu {url} adresinde yayında!");
 
-        // ... (while döngün ve try-catch bloğun buraya aynen gelecek) ...
-    }
-    catch (HttpListenerException ex) when (ex.ErrorCode == 5)
-    {
-        Console.WriteLine("❌ HATA: Admin yetkisi gerekiyor! Terminali yönetici olarak aç.");
+        while (true)
+        {
+            try
+            {
+                // İstek gelmesini bekle
+                HttpListenerContext context = listener.GetContext();
+                
+                // İsteği anında başka bir iş parçacığına devret (bloklamayı önle)
+                ThreadPool.QueueUserWorkItem(state =>
+                {
+                    try {
+                        // SENİN ORİJİNAL İSTEK İŞLEME KODUN BURAYA GELECEK
+                        // HttpListenerRequest request = context.Request; vb...
+                    }
+                    catch { /* İşlem hatalarını yut */ }
+                    finally { context.Response.Close(); }
+                }, context);
+            }
+            catch (HttpListenerException) { continue; } // Railway'in "dürtmelerini" yut
+            catch (Exception) { continue; }
+        }
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"❌ Sunucu başlatılamadı: {ex.Message}");
+        // Eğer sunucu hiç başlamazsa hatayı buraya yazdır
+        Console.WriteLine($"❌ KRİTİK BAŞLATMA HATASI: {ex.Message}");
     }
 }
         while (true)
