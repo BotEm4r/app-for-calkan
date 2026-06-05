@@ -501,7 +501,7 @@ namespace CalkanGsmWeb
             if (Interlocked.Increment(ref activeConnections) > MAX_CONNECTIONS)
             {
                 Interlocked.Decrement(ref activeConnections);
-                continue
+                continue;
             }
                     HttpListenerContext context = listener.GetContext();
                     ThreadPool.QueueUserWorkItem(_ => 
