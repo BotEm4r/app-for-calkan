@@ -475,27 +475,29 @@ namespace CalkanGsmWeb
             StartServer(port);
         }
 
-      private static void StartServer(string port)
-{
+    private static void StartServer(string port)
+    {
     HttpListener listener = new HttpListener();
     
+    // Sadece işletim sistemine göre tek bir adres tanımla
     if (OperatingSystem.IsWindows())
     {
-        // Kendi bilgisayarında admin yetkisi istememesi için localhost dinle
         listener.Prefixes.Add($"http://localhost:{port}/");
-        Console.WriteLine($"\n[YERELE ÖZEL] Local test modu aktif: http://localhost:{port}/");
+        Console.WriteLine($"[YERELE ÖZEL] Local test modu: http://localhost:{port}/");
     }
     else
     {
-        // Railway (Linux) ortamında dışarıdan gelecek tüm istekleri kabul etmesi için * dinle
-        listener.Prefixes.Add($"http://*:{port}/");
-        Console.WriteLine($"🚀 Sunucu bulutta başlatılıyor. Dinlenen Port: {port}");
+        // Railway (Linux) için * yerine 0.0.0.0 kullanmak daha garantidir
+        // Yanlış: listener.Prefixes.Add($"http://8.8.8.8:{port}/");
+// DOĞRUSU:
+        listener.Prefixes.Add($"http://0.0.0.0:{port}/");
+        Console.WriteLine($"🚀 Sunucu {port} portunda yayında!");
     }
     
     try
     {
         listener.Start();
-        
+        // ... (while döngün burada devam etsin)
         while (true)
         {
             if (Interlocked.Increment(ref activeConnections) > MAX_CONNECTIONS)
