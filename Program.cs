@@ -5,18 +5,16 @@ using System.Net;
 using System.Web;
 using Microsoft.Data.Sqlite;
 using System.Threading;
-using System.Windows.Forms; 
-using Microsoft.Web.WebView2.WinForms; 
 
 namespace CalkanGsmWeb
 {
     class Program
     {
-        private static string dbPath = Path.Combine(AppContext.BaseDirectory, "data", "calkan_gsm.db");
+        private static string dbPath = Path.Combine(Directory.GetCurrentDirectory(), "data", "calkan_gsm.db");
         private static string connStr => $"Data Source={dbPath};";
 
-	private static System.Collections.Generic.Dictionary<string, string> Kullanicilar = new System.Collections.Generic.Dictionary<string, string>();
-	private static string SessionValue = "calkan_oturum_" + Guid.NewGuid().ToString().Substring(0, 8);
+        private static System.Collections.Generic.Dictionary<string, string> Kullanicilar = new System.Collections.Generic.Dictionary<string, string>();
+        private static string SessionValue = "calkan_oturum_" + Guid.NewGuid().ToString().Substring(0, 8);
 
         private static System.Collections.Concurrent.ConcurrentDictionary<string, (int count, DateTime lockUntil)> loginAttempts = new();
         private static System.Collections.Concurrent.ConcurrentDictionary<string, (int count, DateTime window)> rateLimit = new();
@@ -27,7 +25,20 @@ namespace CalkanGsmWeb
 
         private static void ConfigYukle()
         {
-            string configPath = Path.Combine(AppContext.BaseDirectory, "config.txt");
+            // ÖNCE RAILWAY ORTAM DEĞİŞKENLERİNE BAK (KULLANICI1=admin:sifre şeklinde girilebilir)
+            string railwayUser = Environment.GetEnvironmentVariable("KULLANICI1");
+            if (!string.IsNullOrEmpty(railwayUser))
+            {
+                string[] parts = railwayUser.Split(':', 2);
+                if (parts.Length == 2) 
+                {
+                    Kullanicilar[parts[0].Trim()] = parts[1].Trim();
+                    return; // Panelden veri geldiyse config.txt aramaya gerek yok
+                }
+            }
+
+            // RAILWAY PANELİNDE TANIMLANMAMIŞSA LOCALDEKİ CONFIG.TXT'YE BAK
+            string configPath = Path.Combine(Directory.GetCurrentDirectory(), "config.txt");
             if (!File.Exists(configPath))
             {
                 File.WriteAllText(configPath, "KULLANICI1=calkanadmin:fcalkan2626\nPORT=8080");
@@ -35,18 +46,29 @@ namespace CalkanGsmWeb
 
             foreach (string line in File.ReadAllLines(configPath))
             {
-                if (line.StartsWith("#") || !line.Contains("=")) continue;
-                string key = line.Split('=')[0].Trim();
-                string val = line.Split('=')[1].Trim();
+                string trimmedLine = line.Trim();
+                if (string.IsNullOrEmpty(trimmedLine) || trimmedLine.StartsWith("#")) continue;
+
+                int commentIdx = trimmedLine.IndexOf('#');
+                string cleanLine = commentIdx >= 0 ? trimmedLine.Substring(0, commentIdx).Trim() : trimmedLine;
+
+                if (!cleanLine.Contains("=")) continue;
+
+                string[] kvParts = cleanLine.Split('=', 2);
+                string key = kvParts[0].Trim();
+                string val = kvParts[1].Trim();
 
                 if (key.StartsWith("KULLANICI"))
                 {
-                    string[] parts = val.Split(':');
-                    if (parts.Length == 2) Kullanicilar[parts[0]] = parts[1];
+                    string[] parts = val.Split(':', 2);
+                    if (parts.Length == 2) 
+                    {
+                        Kullanicilar[parts[0].Trim()] = parts[1].Trim();
+                    }
                 }
-                else if (key == "PORT") Environment.SetEnvironmentVariable("PORT", val);
             }
         }
+
         private static bool IsRateLimited(string ip)
         {
             var now = DateTime.UtcNow;
@@ -88,7 +110,7 @@ namespace CalkanGsmWeb
 
         private static string GetCSS() => @"
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght=400;500;600;700&family=JetBrains+Mono:wght=400;500;600&display=swap');
 
   :root {
     --bg:          #0f172a; 
@@ -105,17 +127,17 @@ namespace CalkanGsmWeb
   }
 
   :root[data-theme='light'] {
-    --bg:          #f8fafc; 
+    --bg:          #e2e8f0; 
     --surface:     #ffffff; 
-    --surface-top: #e2e8f0; 
-    --border:      #cbd5e1; 
+    --surface-top: #cbd5e1; 
+    --border:      #94a3b8; 
     --text:        #0f172a; 
-    --muted:       #64748b; 
+    --muted:       #475569; 
     --accent:      #0284c7; 
     --green:       #16a34a; 
     --whatsapp:    #16a34a;
     --red:         #dc2626; 
-    --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+    --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.08);
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; transition: background-color 0.2s, border-color 0.2s; }
@@ -443,7 +465,6 @@ namespace CalkanGsmWeb
 
         private static string Footer => "</div></body></html>";
 
-        [STAThread] 
         static void Main(string[] args)
         {
             ConfigYukle(); 
@@ -451,59 +472,19 @@ namespace CalkanGsmWeb
             TabloyuHazirla();
             
             string port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
-            string siteUrl = $"http://localhost:{port}/";
-
-            Thread serverThread = new Thread(() => StartServer(port));
-            serverThread.IsBackground = true;
-            serverThread.Start();
-
-            Thread.Sleep(500);
-
-            Application.EnableVisualStyles();
-            Application.SetCompatibleTextRenderingDefault(false);
-
-            Form mainForm = new Form
-            {
-                Text = "Çalkan GSM Mağaza Yönetim Paneli",
-                Width = 850,
-                Height = 750,
-		WindowState = FormWindowState.Maximized,
-                StartPosition = FormStartPosition.CenterScreen,
-                BackColor = System.Drawing.Color.FromArgb(15, 23, 42) 
-            };
-
-            WebView2 webView = new WebView2
-            {
-                Dock = DockStyle.Fill
-            };
-
-            mainForm.Controls.Add(webView);
-
-            mainForm.Load += async (s, e) =>
-            {
-                try
-                {
-                    await webView.EnsureCoreWebView2Async(null);
-                    webView.CoreWebView2.Navigate(siteUrl);
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show("WebView2 motoru yüklenemedi: " + ex.Message);
-                }
-            };
-
-            Application.Run(mainForm);
+            StartServer(port);
         }
 
         private static void StartServer(string port)
         {
             HttpListener listener = new HttpListener();
-            listener.Prefixes.Add($"http://localhost:{port}/");
+            // BULUTTA HER YERDEN ERİŞİLEBİLMESİ İÇİN LOCALHOST YERİNE * YAPTIK
+            listener.Prefixes.Add($"http://*:{port}/");
             
             try
             {
                 listener.Start();
-                Console.WriteLine($"🚀 Arka Plan Sunucusu Aktif! Port: {port}");
+                Console.WriteLine($"🚀 Web Sunucusu Başarıyla Başlatıldı! Port: {port}");
 
                 while (true)
                 {
@@ -569,7 +550,10 @@ namespace CalkanGsmWeb
                                 {
                                     string body = new StreamReader(request.InputStream, request.ContentEncoding).ReadToEnd();
                                     var nv = HttpUtility.ParseQueryString(body);
-				    if (Kullanicilar.ContainsKey(nv["kullanici"]) && Kullanicilar[nv["kullanici"]] == nv["sifre"])
+                                    string reqUser = nv["kullanici"] ?? "";
+                                    string reqPass = nv["sifre"] ?? "";
+
+                                    if (!string.IsNullOrEmpty(reqUser) && Kullanicilar.TryGetValue(reqUser, out var correctPass) && correctPass == reqPass)
                                     {
                                         ResetFail(ip);
                                         
@@ -611,8 +595,8 @@ namespace CalkanGsmWeb
                                        "<div class='wrap'><div class='login-wrapper'><div class='login-card'>" +
                                        "<div class='login-head'>Mağaza Oturumu</div>" +
                                        "<form action='/login' method='POST' autocomplete='off'>" +
-				       "<div class='form-field'><label>Kullanıcı Adı</label><input type='text' name='kullanici' class='form-input' required autocomplete='off'></div>" +
-				       "<div class='form-field'><label>Şifre</label><input type='password' name='sifre' class='form-input' required autocomplete='new-password'></div>" +
+                                       "<div class='form-field'><label>Kullanıcı Adı</label><input type='text' name='kullanici' class='form-input' required autocomplete='off'></div>" +
+                                       "<div class='form-field'><label>Şifre</label><input type='password' name='sifre' class='form-input' required autocomplete='new-password'></div>" +
                                        "<label class='remember-me'><input type='checkbox' name='hatirla'> Oturumu Açık Tut (30 Gün)</label>" +
                                        "<button type='submit' class='action-btn btn-submit'>Sistemi Aç</button>" +
                                        "</form></div></div></div></body></html>";
@@ -707,12 +691,10 @@ namespace CalkanGsmWeb
                                                 while (r.Read())
                                                 {
                                                     string rawPhone = r["model"]?.ToString() ?? "";
-                                                    // Telefon numarasını WhatsApp formatına getir (Baştaki 0'ı at, ülke kodunu ekle)
                                                     string cleanPhone = rawPhone.Replace(" ", "").Replace("-", "").Replace("(", "").Replace(")", "");
                                                     if (cleanPhone.StartsWith("0")) cleanPhone = cleanPhone.Substring(1);
                                                     if (!cleanPhone.StartsWith("90") && cleanPhone.Length == 10) cleanPhone = "90" + cleanPhone;
 
-                                                    // Şablon Mesaj metni
                                                     string mesajMetni = $"Merhaba, Çalkan GSM'den yazıyoruz. {r["imei"]} {r["alinma_tarihi"]} cihazınızın teknik servis işlemleri başarıyla tamamlanmıştır. Cihazınızı dükkanımızdan teslim alabilirsiniz.";
                                                     string encodedMsg = HttpUtility.UrlEncode(mesajMetni);
                                                     string waLink = $"https://wa.me/{cleanPhone}?text={encodedMsg}";
@@ -730,7 +712,6 @@ namespace CalkanGsmWeb
                                                     sb.AppendFormat("<div class='row-notes'><strong>Arıza Durum Notu:</strong> {0}</div>", r["kutu_fatura"]);
                                                     
                                                     sb.Append("<div class='row-actions'>");
-                                                    // WHATSAPP BUTONU (Hedef yeni pencerede açılır, WhatsApp Web tetiklenir)
                                                     sb.AppendFormat("<a href='{0}' target='_blank' class='action-btn btn-whatsapp'>💬 WhatsApp Bildir</a>", waLink);
                                                     
                                                     sb.Append("<form action='/sil' method='POST' style='margin:0;'>");
