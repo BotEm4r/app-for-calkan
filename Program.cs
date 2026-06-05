@@ -516,7 +516,6 @@ namespace CalkanGsmWeb
         // Eğer sunucu hiç başlamazsa hatayı buraya yazdır
         Console.WriteLine($"❌ KRİTİK BAŞLATMA HATASI: {ex.Message}");
     }
-}
         while (true)
         {
             if (Interlocked.Increment(ref activeConnections) > MAX_CONNECTIONS)
