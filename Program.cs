@@ -297,6 +297,7 @@ namespace CalkanGsmWeb
     outline: none;
   }
   .form-input:focus { border-color: var(--accent); }
+  select.form-input { cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; padding-right: 36px; }
 
   /* Şifre alanı wrapper */
   .password-wrapper {
@@ -618,9 +619,14 @@ namespace CalkanGsmWeb
                             }
 
                             bool oturumAcikMi = false;
+                            string aktifKullanici = "";
                             Cookie? otuCookie = request.Cookies["calkan_session"];
                             if (otuCookie != null && otuCookie.Value == SessionValue)
+                            {
                                 oturumAcikMi = true;
+                                Cookie? userCookie = request.Cookies["calkan_user"];
+                                if (userCookie != null) aktifKullanici = userCookie.Value;
+                            }
 
                             string html = "";
 
@@ -650,6 +656,7 @@ namespace CalkanGsmWeb
                                             expiresAttr = "; Expires=" + DateTime.Now.AddDays(30).ToString("R");
 
                                         response.Headers.Add("Set-Cookie", "calkan_session=" + SessionValue + "; Path=/" + expiresAttr + "; SameSite=Strict");
+                                        response.Headers.Add("Set-Cookie", "calkan_user=" + reqUser + "; Path=/" + expiresAttr + "; SameSite=Strict");
                                         response.StatusCode = 302;
                                         response.Headers.Add("Location", "/");
                                         response.OutputStream.Close();
@@ -670,6 +677,7 @@ namespace CalkanGsmWeb
                             else if (rawUrl == "/logout")
                             {
                                 response.Headers.Add("Set-Cookie", "calkan_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT");
+                                response.Headers.Add("Set-Cookie", "calkan_user=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT");
                                 response.StatusCode = 302;
                                 response.Headers.Add("Location", "/");
                                 response.OutputStream.Close();
@@ -705,6 +713,7 @@ namespace CalkanGsmWeb
                                        "  <a href='/vitrin_listele' class='menu-card'><span class='label'>Vitrin Stok Listesi</span><span class='desc'>Şu an rafta satılmayı bekleyen güncel envanter.</span></a>" +
                                        "  <a href='/arsiv_panel' class='menu-card menu-full'><span class='label'>Geçmiş İşlemler Arşivi</span><span class='desc'>Tamamlanıp teslim edilmiş tamirler ve satılmış eski cihazların dökümü.</span></a>" +
                                        "</div>" +
+                                       (aktifKullanici == "admin" ? "<a href='/yedek' class='action-btn btn-secondary' style='width:100%;margin-top:16px;justify-content:center;display:flex;'>💾 Veritabanı Yedeği İndir</a>" : "") +
                                        "<a href='/logout' class='action-btn btn-close-shop'>Güvenli Çıkış (Oturumu Kapat)</a>" +
                                        Footer;
                             }
@@ -720,6 +729,7 @@ namespace CalkanGsmWeb
                                        "<div class='form-field'><label>Yapılacak Arıza İşlemi</label><input type='text' name='islem' class='form-input' placeholder='Örn: Batarya Değişimi, Şarj Soketi' required autocomplete='off'></div>" +
                                        "<div class='form-field'><label>Alınacak Tahmini Ücret (TL)</label><input type='text' name='t_fiyat' class='form-input' placeholder='Müşteriye verilen fiyat' required autocomplete='off'></div>" +
                                        "<div class='form-field'><label>Arıza / Kozmetik Notu</label><input type='text' name='ariza' class='form-input' placeholder='Ekranda çizik var, şifre alındı vs.' required autocomplete='off'></div>" +
+                                       "<div class='form-field'><label>Tamir Durumu</label><select name='tamir_durum' class='form-input'><option value='Bekliyor'>⏳ Bekliyor</option><option value='Tamirde'>🔧 Tamirde</option><option value='Parça Bekleniyor'>📦 Parça Bekleniyor</option><option value='Hazır'>✅ Hazır</option></select></div>" +
                                        "<button type='submit' class='action-btn btn-submit'>Kabulü Onayla ve Kaydet</button>" +
                                        "</form>" +
                                        "</div>" +
@@ -745,7 +755,7 @@ namespace CalkanGsmWeb
                                             command.Parameters.AddWithValue("@satis", nv["t_fiyat"]);
                                             command.Parameters.AddWithValue("@durum", "TAMIR");
                                             command.Parameters.AddWithValue("@kutu", nv["ariza"]);
-                                            command.Parameters.AddWithValue("@garanti", "-");
+                                            command.Parameters.AddWithValue("@garanti", nv["tamir_durum"] ?? "Bekliyor");
                                             command.ExecuteNonQuery();
                                         }
                                     }
@@ -814,6 +824,10 @@ namespace CalkanGsmWeb
                                                     sb.AppendFormat("<span class='tag'>📅 Kabul: {0}</span>", alinmaTarihi);
                                                     sb.AppendFormat("<span class='tag'>📞 {0}</span>", rawPhone);
                                                     sb.AppendFormat("<span class='tag'>🛠️ {0}</span>", r["fiyat"]);
+                                                    // Durum badge
+                                                    string durumVal = r["garanti"]?.ToString() ?? "Bekliyor";
+                                                    string durumColor = durumVal == "Hazır" ? "#4ade80" : durumVal == "Tamirde" ? "#38bdf8" : durumVal == "Parça Bekleniyor" ? "#fb923c" : "#94a3b8";
+                                                    sb.AppendFormat("<span class='tag' style='border-color:{1};color:{1};font-weight:600;'>{0}</span>", durumVal, durumColor);
                                                     if (!string.IsNullOrEmpty(beklemeBadge)) sb.Append(beklemeBadge);
                                                     sb.Append("</div>");
                                                     sb.AppendFormat("<div class='row-notes'><strong>Arıza Notu:</strong> {0}</div>", r["kutu_fatura"]);
@@ -1055,6 +1069,24 @@ namespace CalkanGsmWeb
                                 sb.Append(Footer);
                                 html = sb.ToString();
                             }
+                            else if (rawUrl == "/yedek" && aktifKullanici == "admin")
+                            {
+                                try
+                                {
+                                    byte[] dbBytes = File.ReadAllBytes(dbPath);
+                                    string fileName = "calkan_gsm_yedek_" + DateTime.Now.ToString("yyyyMMdd_HHmm") + ".db";
+                                    response.ContentType = "application/octet-stream";
+                                    response.Headers.Add("Content-Disposition", "attachment; filename=" + fileName);
+                                    response.ContentLength64 = dbBytes.Length;
+                                    response.OutputStream.Write(dbBytes, 0, dbBytes.Length);
+                                    response.OutputStream.Close();
+                                    return;
+                                }
+                                catch (Exception ex)
+                                {
+                                    html = GetHeader("Hata", "/", "Ana Menu") + "<div class='alert alert-err'>" + ex.Message + "</div>" + Footer;
+                                }
+                            }
                             else if (rawUrl.StartsWith("/duzenle") && method == "GET")
                             {
                                 var qs = HttpUtility.ParseQueryString(rawUrl.Contains("?") ? rawUrl.Substring(rawUrl.IndexOf('?') + 1) : "");
@@ -1092,6 +1124,12 @@ namespace CalkanGsmWeb
                                                            "<div class='form-field'><label>Yapilan Islem</label><input type='text' name='islem' class='form-input' value='" + System.Web.HttpUtility.HtmlEncode(r["fiyat"]?.ToString() ?? "") + "' required autocomplete='off'></div>" +
                                                            "<div class='form-field'><label>Tamir Ucreti (TL)</label><input type='text' name='t_fiyat' class='form-input' value='" + System.Web.HttpUtility.HtmlEncode(r["satis_fiyati"]?.ToString() ?? "") + "' required autocomplete='off'></div>" +
                                                            "<div class='form-field'><label>Ariza / Kozmetik Notu</label><input type='text' name='ariza' class='form-input' value='" + System.Web.HttpUtility.HtmlEncode(r["kutu_fatura"]?.ToString() ?? "") + "' required autocomplete='off'></div>" +
+                                                           "<div class='form-field'><label>Tamir Durumu</label><select name='tamir_durum' class='form-input'>" +
+                                                           (r["garanti"]?.ToString() == "Bekliyor"         ? "<option value='Bekliyor' selected>⏳ Bekliyor</option>" : "<option value='Bekliyor'>⏳ Bekliyor</option>") +
+                                                           (r["garanti"]?.ToString() == "Tamirde"          ? "<option value='Tamirde' selected>🔧 Tamirde</option>" : "<option value='Tamirde'>🔧 Tamirde</option>") +
+                                                           (r["garanti"]?.ToString() == "Parça Bekleniyor" ? "<option value='Parça Bekleniyor' selected>📦 Parça Bekleniyor</option>" : "<option value='Parça Bekleniyor'>📦 Parça Bekleniyor</option>") +
+                                                           (r["garanti"]?.ToString() == "Hazır"            ? "<option value='Hazır' selected>✅ Hazır</option>" : "<option value='Hazır'>✅ Hazır</option>") +
+                                                           "</select></div>" +
                                                            "<div class='form-field'><label>Kabul Tarihi</label><input type='text' name='kabul_tarihi' class='form-input' value='" + System.Web.HttpUtility.HtmlEncode(r["alinma_tarihi"]?.ToString() ?? DateTime.Now.ToString("dd.MM.yyyy")) + "' placeholder='GG.AA.YYYY' autocomplete='off'></div>" +
                                                            "<button type='submit' class='action-btn btn-submit'>Degisiklikleri Kaydet</button>" +
                                                            "</form></div>" + Footer;
@@ -1154,7 +1192,7 @@ namespace CalkanGsmWeb
                                         connection.Open();
                                         if (tip == "tamir")
                                         {
-                                            using (var cmd = new SqliteCommand("UPDATE vitrin SET marka=@marka, model=@model, imei=@imei, fiyat=@fiyat, satis_fiyati=@satis, kutu_fatura=@kutu, alinma_tarihi=@alinma WHERE id=@id;", connection))
+                                            using (var cmd = new SqliteCommand("UPDATE vitrin SET marka=@marka, model=@model, imei=@imei, fiyat=@fiyat, satis_fiyati=@satis, kutu_fatura=@kutu, garanti=@garanti, alinma_tarihi=@alinma WHERE id=@id;", connection))
                                             {
                                                 cmd.Parameters.AddWithValue("@marka", nv["musteri"] ?? "");
                                                 cmd.Parameters.AddWithValue("@model", nv["telefon"] ?? "");
@@ -1162,6 +1200,7 @@ namespace CalkanGsmWeb
                                                 cmd.Parameters.AddWithValue("@fiyat", nv["islem"] ?? "");
                                                 cmd.Parameters.AddWithValue("@satis", nv["t_fiyat"] ?? "");
                                                 cmd.Parameters.AddWithValue("@kutu", nv["ariza"] ?? "");
+                                                cmd.Parameters.AddWithValue("@garanti", nv["tamir_durum"] ?? "Bekliyor");
                                                 string kabulTarihi = nv["kabul_tarihi"] ?? "";
                                                 if (string.IsNullOrWhiteSpace(kabulTarihi)) kabulTarihi = DateTime.Now.ToString("dd.MM.yyyy");
                                                 cmd.Parameters.AddWithValue("@alinma", kabulTarihi);
