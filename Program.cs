@@ -1087,6 +1087,7 @@ namespace CalkanGsmWeb
                                                            "<div class='form-field'><label>Yapilan Islem</label><input type='text' name='islem' class='form-input' value='" + System.Web.HttpUtility.HtmlEncode(r["fiyat"]?.ToString() ?? "") + "' required autocomplete='off'></div>" +
                                                            "<div class='form-field'><label>Tamir Ucreti (TL)</label><input type='text' name='t_fiyat' class='form-input' value='" + System.Web.HttpUtility.HtmlEncode(r["satis_fiyati"]?.ToString() ?? "") + "' required autocomplete='off'></div>" +
                                                            "<div class='form-field'><label>Ariza / Kozmetik Notu</label><input type='text' name='ariza' class='form-input' value='" + System.Web.HttpUtility.HtmlEncode(r["kutu_fatura"]?.ToString() ?? "") + "' required autocomplete='off'></div>" +
+                                                           "<div class='form-field'><label>Kabul Tarihi</label><input type='text' name='kabul_tarihi' class='form-input' value='" + System.Web.HttpUtility.HtmlEncode(r["alinma_tarihi"]?.ToString() ?? DateTime.Now.ToString("dd.MM.yyyy")) + "' placeholder='GG.AA.YYYY' autocomplete='off'></div>" +
                                                            "<button type='submit' class='action-btn btn-submit'>Degisiklikleri Kaydet</button>" +
                                                            "</form></div>" + Footer;
                                                 }
@@ -1110,6 +1111,7 @@ namespace CalkanGsmWeb
                                                            "<div class='form-field'><label>Alis Fiyati / Maliyet (TL)</label><input type='text' name='v_alis' class='form-input' value='" + System.Web.HttpUtility.HtmlEncode(r["fiyat"]?.ToString() ?? "") + "' autocomplete='off'></div>" +
                                                            "<div class='form-field'><label>Satis Fiyati (TL)</label><input type='text' name='v_satis' class='form-input' value='" + System.Web.HttpUtility.HtmlEncode(r["satis_fiyati"]?.ToString() ?? "") + "' required autocomplete='off'></div>" +
                                                            "<div class='form-field'><label>Kutu / Fatura / Aksesuar</label><input type='text' name='v_kutu' class='form-input' value='" + System.Web.HttpUtility.HtmlEncode(r["kutu_fatura"]?.ToString() ?? "") + "' autocomplete='off'></div>" +
+                                                           "<div class='form-field'><label>Eklenme Tarihi</label><input type='text' name='v_tarih' class='form-input' value='" + System.Web.HttpUtility.HtmlEncode(r["alinma_tarihi"]?.ToString() ?? DateTime.Now.ToString("dd.MM.yyyy")) + "' placeholder='GG.AA.YYYY' autocomplete='off'></div>" +
                                                            "<button type='submit' class='action-btn btn-submit'>Degisiklikleri Kaydet</button>" +
                                                            "</form></div>" + Footer;
                                                 }
@@ -1135,7 +1137,7 @@ namespace CalkanGsmWeb
                                         connection.Open();
                                         if (tip == "tamir")
                                         {
-                                            using (var cmd = new SqliteCommand("UPDATE vitrin SET marka=@marka, model=@model, imei=@imei, fiyat=@fiyat, satis_fiyati=@satis, kutu_fatura=@kutu WHERE id=@id;", connection))
+                                            using (var cmd = new SqliteCommand("UPDATE vitrin SET marka=@marka, model=@model, imei=@imei, fiyat=@fiyat, satis_fiyati=@satis, kutu_fatura=@kutu, alinma_tarihi=@alinma WHERE id=@id;", connection))
                                             {
                                                 cmd.Parameters.AddWithValue("@marka", nv["musteri"] ?? "");
                                                 cmd.Parameters.AddWithValue("@model", nv["telefon"] ?? "");
@@ -1143,6 +1145,9 @@ namespace CalkanGsmWeb
                                                 cmd.Parameters.AddWithValue("@fiyat", nv["islem"] ?? "");
                                                 cmd.Parameters.AddWithValue("@satis", nv["t_fiyat"] ?? "");
                                                 cmd.Parameters.AddWithValue("@kutu", nv["ariza"] ?? "");
+                                                string kabulTarihi = nv["kabul_tarihi"] ?? "";
+                                                if (string.IsNullOrWhiteSpace(kabulTarihi)) kabulTarihi = DateTime.Now.ToString("dd.MM.yyyy");
+                                                cmd.Parameters.AddWithValue("@alinma", kabulTarihi);
                                                 cmd.Parameters.AddWithValue("@id", editId);
                                                 cmd.ExecuteNonQuery();
                                             }
@@ -1150,7 +1155,7 @@ namespace CalkanGsmWeb
                                         else
                                         {
                                             string birlesik = string.Format("{0} | {1} | Pil: {2}", nv["v_gb"] ?? "", nv["v_renk"] ?? "", nv["v_pil"] ?? "");
-                                            using (var cmd = new SqliteCommand("UPDATE vitrin SET model=@model, marka=@marka, imei=@imei, fiyat=@fiyat, satis_fiyati=@satis, kutu_fatura=@kutu, garanti=@garanti WHERE id=@id;", connection))
+                                            using (var cmd = new SqliteCommand("UPDATE vitrin SET model=@model, marka=@marka, imei=@imei, fiyat=@fiyat, satis_fiyati=@satis, kutu_fatura=@kutu, garanti=@garanti, alinma_tarihi=@alinma WHERE id=@id;", connection))
                                             {
                                                 cmd.Parameters.AddWithValue("@model", nv["v_model"] ?? "");
                                                 cmd.Parameters.AddWithValue("@marka", birlesik);
@@ -1159,6 +1164,9 @@ namespace CalkanGsmWeb
                                                 cmd.Parameters.AddWithValue("@satis", nv["v_satis"] ?? "");
                                                 cmd.Parameters.AddWithValue("@kutu", nv["v_kutu"] ?? "");
                                                 cmd.Parameters.AddWithValue("@garanti", nv["v_garanti"] ?? "");
+                                                string vTarih = nv["v_tarih"] ?? "";
+                                                if (string.IsNullOrWhiteSpace(vTarih)) vTarih = DateTime.Now.ToString("dd.MM.yyyy");
+                                                cmd.Parameters.AddWithValue("@alinma", vTarih);
                                                 cmd.Parameters.AddWithValue("@id", editId);
                                                 cmd.ExecuteNonQuery();
                                             }
