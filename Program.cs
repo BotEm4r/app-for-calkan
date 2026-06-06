@@ -20,28 +20,54 @@ namespace CalkanGsmWeb
         private static System.Collections.Concurrent.ConcurrentDictionary<string, (int count, DateTime window)> rateLimit = new();
         private static int activeConnections = 0;
         private const int MAX_CONNECTIONS = 100;
-        private const int MAX_RPS = 25; 
-        private const int MAX_BODY_BYTES = 10240; 
+        private const int MAX_RPS = 25;
+        private const int MAX_BODY_BYTES = 10240;
+
+        // config.txt veya Railway env'den okunan port (varsayılan 8080)
+        private static string configPort = "8080";
 
         private static void ConfigYukle()
         {
-            // ÖNCE RAILWAY ORTAM DEĞİŞKENLERİNE BAK (KULLANICI1=admin:sifre şeklinde girilebilir)
-            string railwayUser = Environment.GetEnvironmentVariable("KULLANICI1");
-            if (!string.IsNullOrEmpty(railwayUser))
+            // ── 1. ADIM: RAILWAY ORTAM DEĞİŞKENLERİNE BAK ──────────────────────────
+            // KULLANICI1=admin:sifre, KULLANICI2=teknisyen:pass123 ... şeklinde birden fazla tanımlanabilir
+            bool railwayKullaniciBulundu = false;
+            for (int i = 1; i <= 20; i++)
             {
-                string[] parts = railwayUser.Split(':', 2);
-                if (parts.Length == 2) 
+                string envVal = Environment.GetEnvironmentVariable("KULLANICI" + i);
+                if (string.IsNullOrEmpty(envVal)) continue;
+                string[] parts = envVal.Split(':', 2);
+                if (parts.Length == 2 && !string.IsNullOrWhiteSpace(parts[0]) && !string.IsNullOrWhiteSpace(parts[1]))
                 {
                     Kullanicilar[parts[0].Trim()] = parts[1].Trim();
-                    return; // Panelden veri geldiyse config.txt aramaya gerek yok
+                    railwayKullaniciBulundu = true;
                 }
             }
 
-            // RAILWAY PANELİNDE TANIMLANMAMIŞSA LOCALDEKİ CONFIG.TXT'YE BAK
+            // Railway'de PORT env değişkeni varsa onu da al
+            string railwayPort = Environment.GetEnvironmentVariable("PORT");
+            if (!string.IsNullOrEmpty(railwayPort))
+                configPort = railwayPort;
+
+            // Railway'de kullanıcı tanımlandıysa config.txt'ye gerek yok
+            if (railwayKullaniciBulundu)
+            {
+                Console.WriteLine($"✅ {Kullanicilar.Count} kullanıcı Railway ortam değişkenlerinden yüklendi.");
+                return;
+            }
+
+            // ── 2. ADIM: LOCALDEKİ CONFIG.TXT'YE BAK ────────────────────────────────
             string configPath = Path.Combine(Directory.GetCurrentDirectory(), "config.txt");
             if (!File.Exists(configPath))
             {
-                File.WriteAllText(configPath, "KULLANICI1=calkanadmin:fcalkan2626\nPORT=8080");
+                // Örnek config.txt oluştur
+                File.WriteAllText(configPath,
+                    "# Calkan GSM - Kullanici ve Port Ayarlari\n" +
+                    "# Kullanici eklemek icin KULLANICI1, KULLANICI2 ... seklinde devam ettirin\n" +
+                    "# Format: KULLANICIn=kullanici_adi:sifre\n\n" +
+                    "KULLANICI1=calkanadmin:fcalkan2626\n" +
+                    "KULLANICI2=teknisyen:calkan1234\n" +
+                    "PORT=8080\n");
+                Console.WriteLine("📄 config.txt bulunamadı, varsayılan dosya oluşturuldu.");
             }
 
             foreach (string line in File.ReadAllLines(configPath))
@@ -55,17 +81,32 @@ namespace CalkanGsmWeb
                 if (!cleanLine.Contains("=")) continue;
 
                 string[] kvParts = cleanLine.Split('=', 2);
-                string key = kvParts[0].Trim();
+                string key = kvParts[0].Trim().ToUpper();
                 string val = kvParts[1].Trim();
 
                 if (key.StartsWith("KULLANICI"))
                 {
                     string[] parts = val.Split(':', 2);
-                    if (parts.Length == 2) 
+                    if (parts.Length == 2 && !string.IsNullOrWhiteSpace(parts[0]) && !string.IsNullOrWhiteSpace(parts[1]))
                     {
                         Kullanicilar[parts[0].Trim()] = parts[1].Trim();
                     }
                 }
+                else if (key == "PORT" && !string.IsNullOrWhiteSpace(val))
+                {
+                    configPort = val;
+                }
+            }
+
+            if (Kullanicilar.Count == 0)
+            {
+                // Config.txt'de hiç kullanıcı yoksa güvenli fallback
+                Kullanicilar["calkanadmin"] = "fcalkan2626";
+                Console.WriteLine("⚠️ config.txt'de kullanıcı bulunamadı, varsayılan hesap kullanılıyor.");
+            }
+            else
+            {
+                Console.WriteLine($"✅ {Kullanicilar.Count} kullanıcı config.txt'den yüklendi. Port: {configPort}");
             }
         }
 
@@ -95,7 +136,7 @@ namespace CalkanGsmWeb
 
         private static void RecordFail(string ip)
         {
-            loginAttempts.AddOrUpdate(ip, (1, DateTime.MinValue), (k, old) => 
+            loginAttempts.AddOrUpdate(ip, (1, DateTime.MinValue), (k, old) =>
                 (old.count + 1, old.count + 1 >= 5 ? DateTime.UtcNow.AddMinutes(15) : old.lockUntil));
         }
 
@@ -110,34 +151,34 @@ namespace CalkanGsmWeb
 
         private static string GetCSS() => @"
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght=400;500;600;700&family=JetBrains+Mono:wght=400;500;600&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
   :root {
-    --bg:          #0f172a; 
-    --surface:     #1e293b; 
-    --surface-top: #334155; 
-    --border:      #384152; 
-    --text:        #f8fafc; 
-    --muted:       #94a3b8; 
-    --accent:      #38bdf8; 
-    --green:       #4ade80; 
+    --bg:          #0f172a;
+    --surface:     #1e293b;
+    --surface-top: #334155;
+    --border:      #384152;
+    --text:        #f8fafc;
+    --muted:       #94a3b8;
+    --accent:      #38bdf8;
+    --green:       #4ade80;
     --whatsapp:    #22c55e;
-    --red:         #f87171; 
-    --shadow:      0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+    --red:         #f87171;
+    --shadow:      0 10px 25px -5px rgba(0,0,0,0.3), 0 8px 10px -6px rgba(0,0,0,0.3);
   }
 
   :root[data-theme='light'] {
-    --bg:          #e2e8f0; 
-    --surface:     #ffffff; 
-    --surface-top: #cbd5e1; 
-    --border:      #94a3b8; 
-    --text:        #0f172a; 
-    --muted:       #475569; 
-    --accent:      #0284c7; 
-    --green:       #16a34a; 
+    --bg:          #e2e8f0;
+    --surface:     #ffffff;
+    --surface-top: #cbd5e1;
+    --border:      #94a3b8;
+    --text:        #0f172a;
+    --muted:       #475569;
+    --accent:      #0284c7;
+    --green:       #16a34a;
     --whatsapp:    #16a34a;
-    --red:         #dc2626; 
-    --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.08);
+    --red:         #dc2626;
+    --shadow: 0 10px 25px -5px rgba(0,0,0,0.08), 0 8px 10px -6px rgba(0,0,0,0.08);
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; transition: background-color 0.2s, border-color 0.2s; }
@@ -167,29 +208,16 @@ namespace CalkanGsmWeb
     margin-bottom: 40px;
     box-shadow: var(--shadow);
   }
-  .shop-title {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
+  .shop-title { display: flex; align-items: center; gap: 12px; }
   .shop-badge {
     width: 12px; height: 12px;
     background: var(--accent);
     border-radius: 4px;
     box-shadow: 0 0 10px var(--accent);
   }
-  .shop-name {
-    font-size: 16px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-  
-  .nav-right {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
+  .shop-name { font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+
+  .nav-right { display: flex; align-items: center; gap: 12px; }
   .theme-toggle {
     background: var(--bg);
     border: 1px solid var(--border);
@@ -203,14 +231,12 @@ namespace CalkanGsmWeb
     align-items: center;
     gap: 6px;
   }
-  .theme-toggle:hover {
-    border-color: var(--accent);
-  }
+  .theme-toggle:hover { border-color: var(--accent); }
   .shop-status {
     font-size: 12px;
     color: var(--green);
     font-weight: 600;
-    background: rgba(74, 222, 128, 0.1);
+    background: rgba(74,222,128,0.1);
     padding: 6px 12px;
     border-radius: 20px;
   }
@@ -236,11 +262,10 @@ namespace CalkanGsmWeb
   .menu-card:hover {
     border-color: var(--accent);
     transform: translateY(-2px);
-    box-shadow: 0 12px 30px rgba(56, 189, 248, 0.15);
+    box-shadow: 0 12px 30px rgba(56,189,248,0.15);
   }
   .menu-card .label { font-size: 18px; font-weight: 700; }
   .menu-card .desc { font-size: 12px; color: var(--muted); line-height: 1.4; }
-
   .menu-full { grid-column: span 2; height: 100px; }
 
   .form-box {
@@ -272,6 +297,31 @@ namespace CalkanGsmWeb
     outline: none;
   }
   .form-input:focus { border-color: var(--accent); }
+
+  /* Şifre alanı wrapper */
+  .password-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+  .password-wrapper .form-input {
+    padding-right: 48px;
+  }
+  .toggle-pass {
+    position: absolute;
+    right: 12px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--muted);
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s;
+  }
+  .toggle-pass:hover { color: var(--accent); }
+  .toggle-pass svg { width: 20px; height: 20px; pointer-events: none; }
 
   .remember-me {
     display: flex;
@@ -322,7 +372,7 @@ namespace CalkanGsmWeb
   }
   .row-title { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
   .row-price { font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 700; color: var(--accent); }
-  
+
   .tags { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
   .tag {
     font-size: 12px;
@@ -371,25 +421,20 @@ namespace CalkanGsmWeb
   .btn-submit { background: var(--accent); color: #fff; width: 100%; margin-top: 10px; }
   :root[data-theme='light'] .btn-submit { color: #fff; }
   .btn-submit:hover { opacity: 0.9; }
-  
   .btn-secondary { background: transparent; border: 1px solid var(--border); color: var(--text); }
   .btn-secondary:hover { background: var(--border); }
-
   .btn-success { background: var(--green); color: #fff; }
   .btn-success:hover { opacity: 0.9; }
-
   .btn-whatsapp { background: var(--whatsapp); color: #fff; gap: 6px; }
   .btn-whatsapp:hover { opacity: 0.9; }
-
   .btn-danger { background: var(--red); color: #fff; }
   .btn-danger:hover { opacity: 0.9; }
-
   .btn-close-shop { background: transparent; border: 1px solid rgba(248,113,113,0.3); color: var(--red); width: 100%; margin-top: 40px; }
   .btn-close-shop:hover { background: rgba(248,113,113,0.1); }
 
   .alert { padding: 16px; border-radius: 10px; font-size: 14px; margin-bottom: 24px; font-weight: 500; text-align: center; }
-  .alert-ok { background: rgba(74, 222, 128, 0.1); border: 1px solid var(--green); color: var(--green); }
-  .alert-err { background: rgba(248, 113, 113, 0.1); border: 1px solid var(--red); color: var(--red); }
+  .alert-ok { background: rgba(74,222,128,0.1); border: 1px solid var(--green); color: var(--green); }
+  .alert-err { background: rgba(248,113,113,0.1); border: 1px solid var(--red); color: var(--red); }
 
   .empty-state {
     text-align: center;
@@ -401,7 +446,15 @@ namespace CalkanGsmWeb
   }
 
   .login-wrapper { min-height: 75vh; display: flex; align-items: center; justify-content: center; }
-  .login-card { width: 100%; max-width: 360px; background: var(--surface); border: 1px solid var(--border); padding: 32px; border-radius: 16px; box-shadow: var(--shadow); }
+  .login-card {
+    width: 100%;
+    max-width: 360px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 32px;
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+  }
   .login-head { font-size: 22px; font-weight: 800; text-align: center; margin-bottom: 24px; letter-spacing: -0.02em; }
 
   .divider-title {
@@ -424,11 +477,7 @@ namespace CalkanGsmWeb
         var rows = document.getElementsByClassName(rowClass);
         for (var i = 0; i < rows.length; i++) {
             var text = rows[i].textContent || rows[i].innerText;
-            if (text.toUpperCase().indexOf(filter) > -1) {
-                rows[i].style.display = '';
-            } else {
-                rows[i].style.display = 'none';
-            }
+            rows[i].style.display = text.toUpperCase().indexOf(filter) > -1 ? '' : 'none';
         }
     }
 
@@ -440,11 +489,23 @@ namespace CalkanGsmWeb
         document.getElementById('theme-lbl').innerText = yeni === 'dark' ? '🌙 Gece' : '☀️ Gündüz';
     }
 
+    function sifreGoster(btn) {
+        var input = btn.closest('.password-wrapper').querySelector('input');
+        var icon  = btn.querySelector('svg');
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.innerHTML = '<path stroke=""currentColor"" stroke-width=""2"" stroke-linecap=""round"" stroke-linejoin=""round"" d=""M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24""/><line stroke=""currentColor"" stroke-width=""2"" stroke-linecap=""round"" x1=""1"" y1=""1"" x2=""23"" y2=""23""/>';
+        } else {
+            input.type = 'password';
+            icon.innerHTML = '<path stroke=""currentColor"" stroke-width=""2"" stroke-linecap=""round"" stroke-linejoin=""round"" d=""M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z""/><circle stroke=""currentColor"" stroke-width=""2"" cx=""12"" cy=""12"" r=""3""/>';
+        }
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
         const kayitliTema = localStorage.getItem('calkan_tema') || 'dark';
         document.documentElement.setAttribute('data-theme', kayitliTema);
         const lbl = document.getElementById('theme-lbl');
-        if(lbl) lbl.innerText = kayitliTema === 'dark' ? '🌙 Gece' : '☀️ Gündüz';
+        if (lbl) lbl.innerText = kayitliTema === 'dark' ? '🌙 Gece' : '☀️ Gündüz';
     });
 </script>
 ";
@@ -463,28 +524,36 @@ namespace CalkanGsmWeb
             (pageBack != "" ? $"<a href='{pageBack}' class='back-link'>← {backLabel}</a>" : "") +
             (pageTitle != "" ? $"<div class='view-heading'><div class='view-title'>{pageTitle}</div></div>" : "");
 
+        // Şifre göster/gizle butonu SVG'si (başlangıçta kapalı göz = şifre gizli)
+        private static string EyeIconHTML =>
+            "<svg viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'>" +
+            "<path stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z'/>" +
+            "<circle stroke='currentColor' stroke-width='2' cx='12' cy='12' r='3'/>" +
+            "</svg>";
+
         private static string Footer => "</div></body></html>";
 
         static void Main(string[] args)
         {
-            ConfigYukle(); 
+            ConfigYukle();
             Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
             TabloyuHazirla();
-            
-            string port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
-            StartServer(port);
+
+            // PORT önceliği: Railway PORT env > config.txt PORT > varsayılan 8080
+            // ConfigYukle içinde configPort zaten ayarlandı
+            StartServer(configPort);
         }
 
         private static void StartServer(string port)
         {
             HttpListener listener = new HttpListener();
-            // BULUTTA HER YERDEN ERİŞİLEBİLMESİ İÇİN LOCALHOST YERİNE * YAPTIK
             listener.Prefixes.Add($"http://*:{port}/");
-            
+
             try
             {
                 listener.Start();
                 Console.WriteLine($"🚀 Web Sunucusu Başarıyla Başlatıldı! Port: {port}");
+                Console.WriteLine($"👥 Aktif kullanıcı sayısı: {Kullanicilar.Count}");
 
                 while (true)
                 {
@@ -495,11 +564,11 @@ namespace CalkanGsmWeb
                     }
 
                     HttpListenerContext context = listener.GetContext();
-                    ThreadPool.QueueUserWorkItem(_ => 
+                    ThreadPool.QueueUserWorkItem(_ =>
                     {
                         HttpListenerRequest request = context.Request;
                         HttpListenerResponse response = context.Response;
-                        
+
                         try
                         {
                             string rawUrl = request.RawUrl ?? "/";
@@ -556,12 +625,10 @@ namespace CalkanGsmWeb
                                     if (!string.IsNullOrEmpty(reqUser) && Kullanicilar.TryGetValue(reqUser, out var correctPass) && correctPass == reqPass)
                                     {
                                         ResetFail(ip);
-                                        
+
                                         string expiresAttr = "";
                                         if (nv["hatirla"] == "on")
-                                        {
                                             expiresAttr = "; Expires=" + DateTime.Now.AddDays(30).ToString("R");
-                                        }
 
                                         response.Headers.Add("Set-Cookie", "calkan_session=" + SessionValue + "; Path=/" + expiresAttr + "; SameSite=Strict");
                                         response.StatusCode = 302;
@@ -591,12 +658,19 @@ namespace CalkanGsmWeb
                             }
                             else if (!oturumAcikMi)
                             {
+                                // Login formu — şifre göster/gizle butonu dahil
                                 html = "<!DOCTYPE html><html data-theme='dark'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>" + GetCSS() + "</head><body>" +
                                        "<div class='wrap'><div class='login-wrapper'><div class='login-card'>" +
                                        "<div class='login-head'>Mağaza Oturumu</div>" +
                                        "<form action='/login' method='POST' autocomplete='off'>" +
                                        "<div class='form-field'><label>Kullanıcı Adı</label><input type='text' name='kullanici' class='form-input' required autocomplete='off'></div>" +
-                                       "<div class='form-field'><label>Şifre</label><input type='password' name='sifre' class='form-input' required autocomplete='new-password'></div>" +
+                                       "<div class='form-field'><label>Şifre</label>" +
+                                       "<div class='password-wrapper'>" +
+                                       "<input type='password' name='sifre' id='sifre-input' class='form-input' required autocomplete='new-password'>" +
+                                       "<button type='button' class='toggle-pass' onclick='sifreGoster(this)' title='Şifreyi göster/gizle'>" +
+                                       EyeIconHTML +
+                                       "</button>" +
+                                       "</div></div>" +
                                        "<label class='remember-me'><input type='checkbox' name='hatirla'> Oturumu Açık Tut (30 Gün)</label>" +
                                        "<button type='submit' class='action-btn btn-submit'>Sistemi Aç</button>" +
                                        "</form></div></div></div></body></html>";
@@ -710,10 +784,10 @@ namespace CalkanGsmWeb
                                                     sb.AppendFormat("<span class='tag'>🛠️ İşlem: {0}</span>", r["fiyat"]);
                                                     sb.Append("</div>");
                                                     sb.AppendFormat("<div class='row-notes'><strong>Arıza Durum Notu:</strong> {0}</div>", r["kutu_fatura"]);
-                                                    
+
                                                     sb.Append("<div class='row-actions'>");
                                                     sb.AppendFormat("<a href='{0}' target='_blank' class='action-btn btn-whatsapp'>💬 WhatsApp Bildir</a>", waLink);
-                                                    
+
                                                     sb.Append("<form action='/sil' method='POST' style='margin:0;'>");
                                                     sb.AppendFormat("<input type='hidden' name='id' value='{0}'>", r["id"]);
                                                     sb.Append("<input type='hidden' name='git' value='tamir'>");
@@ -940,13 +1014,13 @@ namespace CalkanGsmWeb
                                 var nv = HttpUtility.ParseQueryString(body);
                                 string id = nv["id"];
                                 string git = nv["git"];
-                                
+
                                 try
                                 {
                                     using (var connection = new SqliteConnection(connStr))
                                     {
                                         connection.Open();
-                                        
+
                                         if (git == "arsiv")
                                         {
                                             using (var command = new SqliteCommand("DELETE FROM vitrin WHERE id = @id;", connection))
@@ -955,7 +1029,7 @@ namespace CalkanGsmWeb
                                                 command.ExecuteNonQuery();
                                             }
                                         }
-                                        else 
+                                        else
                                         {
                                             string yeniDurum = (git == "tamir") ? "TESLIM_EDILDI" : "SATILDI";
                                             using (var command = new SqliteCommand("UPDATE vitrin SET durum = @durum WHERE id = @id;", connection))
@@ -968,13 +1042,13 @@ namespace CalkanGsmWeb
                                     }
                                 }
                                 catch { }
-                                
+
                                 response.StatusCode = 302;
                                 if (git == "arsiv")
                                     response.Headers.Add("Location", "/arsiv_panel");
                                 else
                                     response.Headers.Add("Location", git == "vitrin" ? "/vitrin_listele" : "/tamir_listele");
-                                    
+
                                 response.OutputStream.Close();
                                 return;
                             }
@@ -990,7 +1064,7 @@ namespace CalkanGsmWeb
                             response.OutputStream.Write(buffer, 0, buffer.Length);
                             response.OutputStream.Close();
                         }
-                        catch { try { response.Close(); } catch {} }
+                        catch { try { response.Close(); } catch { } }
                         finally { Interlocked.Decrement(ref activeConnections); }
                     });
                 }
