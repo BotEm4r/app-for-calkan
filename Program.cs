@@ -997,7 +997,7 @@ namespace CalkanGsmWeb
                                                     sb.AppendFormat("<input type='hidden' name='id' value='{0}'>", r["id"]);
                                                     sb.Append("<input type='hidden' name='git' value='arsiv'>");
                                                     sb.Append("<button type='submit' class='action-btn btn-danger' style='padding:6px 14px; font-size:12px;'>Kayıt Sil</button>");
-                                                    sb.Append("</form></div>");
+                                                    sb.Append("</form></div></div>");
                                                     sb.Append("</div>");
                                                 }
                                             }
@@ -1097,6 +1097,18 @@ namespace CalkanGsmWeb
                                                            "<button type='submit' class='action-btn btn-submit'>Degisiklikleri Kaydet</button>" +
                                                            "</form></div>" + Footer;
                                                 }
+                                                else if (tip == "arsiv_tamir")
+                                                {
+                                                    html = GetHeader("Teslim Tarihini Duzenle", "/arsiv_panel", "Arsiv") +
+                                                           "<div class='form-box'><form action='/duzenle_kaydet' method='POST'>" +
+                                                           "<input type='hidden' name='id' value='" + editId + "'>" +
+                                                           "<input type='hidden' name='tip' value='arsiv_tamir'>" +
+                                                           "<div class='form-field'><label>Musteri</label><input type='text' class='form-input' value='" + System.Web.HttpUtility.HtmlEncode(r["marka"]?.ToString() ?? "") + "' disabled></div>" +
+                                                           "<div class='form-field'><label>Cihaz</label><input type='text' class='form-input' value='" + System.Web.HttpUtility.HtmlEncode(r["imei"]?.ToString() ?? "") + "' disabled></div>" +
+                                                           "<div class='form-field'><label>Teslim Tarihi</label><input type='text' name='teslim_tarihi' class='form-input' value='" + System.Web.HttpUtility.HtmlEncode(r["teslim_tarihi"]?.ToString() ?? DateTime.Now.ToString("dd.MM.yyyy")) + "' placeholder='GG.AA.YYYY' autocomplete='off'></div>" +
+                                                           "<button type='submit' class='action-btn btn-submit'>Tarihi Kaydet</button>" +
+                                                           "</form></div>" + Footer;
+                                                }
                                                 else
                                                 {
                                                     string markaVal = r["marka"]?.ToString() ?? "";
@@ -1158,6 +1170,16 @@ namespace CalkanGsmWeb
                                                 cmd.ExecuteNonQuery();
                                             }
                                         }
+                                        else if (tip == "arsiv_tamir")
+                                        {
+                                            string teslimGuncelle = nv["teslim_tarihi"] ?? DateTime.Now.ToString("dd.MM.yyyy");
+                                            using (var cmd = new SqliteCommand("UPDATE vitrin SET teslim_tarihi=@teslim WHERE id=@id;", connection))
+                                            {
+                                                cmd.Parameters.AddWithValue("@teslim", teslimGuncelle);
+                                                cmd.Parameters.AddWithValue("@id", editId);
+                                                cmd.ExecuteNonQuery();
+                                            }
+                                        }
                                         else
                                         {
                                             string birlesik = string.Format("{0} | {1} | Pil: {2}", nv["v_gb"] ?? "", nv["v_renk"] ?? "", nv["v_pil"] ?? "");
@@ -1179,7 +1201,8 @@ namespace CalkanGsmWeb
                                         }
                                     }
                                     response.StatusCode = 302;
-                                    response.Headers.Add("Location", tip == "tamir" ? "/tamir_listele" : "/vitrin_listele");
+                                    string location = tip == "tamir" ? "/tamir_listele" : tip == "arsiv_tamir" ? "/arsiv_panel" : "/vitrin_listele";
+                                    response.Headers.Add("Location", location);
                                     response.OutputStream.Close();
                                     return;
                                 }
