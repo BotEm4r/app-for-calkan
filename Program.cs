@@ -739,8 +739,8 @@ namespace CalkanGsmWeb
                                         {
                                             command.Parameters.AddWithValue("@marka", nv["musteri"]);
                                             command.Parameters.AddWithValue("@model", nv["telefon"]);
-                                            command.Parameters.AddWithValue("@imei", nv["c_marka"]);
-                                            command.Parameters.AddWithValue("@alinma", nv["c_model"]);
+                                            command.Parameters.AddWithValue("@imei", nv["c_marka"] + " " + nv["c_model"]);
+                                            command.Parameters.AddWithValue("@alinma", DateTime.Now.ToString("dd.MM.yyyy"));
                                             command.Parameters.AddWithValue("@fiyat", nv["islem"]);
                                             command.Parameters.AddWithValue("@satis", nv["t_fiyat"]);
                                             command.Parameters.AddWithValue("@durum", "TAMIR");
@@ -788,9 +788,21 @@ namespace CalkanGsmWeb
                                                     if (cleanPhone.StartsWith("0")) cleanPhone = cleanPhone.Substring(1);
                                                     if (!cleanPhone.StartsWith("90") && cleanPhone.Length == 10) cleanPhone = "90" + cleanPhone;
 
-                                                    string mesajMetni = $"Merhaba, Çalkan GSM'den yazıyoruz. {r["imei"]} {r["alinma_tarihi"]} cihazınızın teknik servis işlemleri başarıyla tamamlanmıştır. Cihazınızı dükkanımızdan teslim alabilirsiniz.";
-                                                    string encodedMsg = HttpUtility.UrlEncode(mesajMetni);
-                                                    string waLink = $"https://wa.me/{cleanPhone}?text={encodedMsg}";
+                                                    // Bekleme günü hesapla
+                                                    string alinmaTarihi = r["alinma_tarihi"]?.ToString() ?? "";
+                                                    string beklemeBadge = "";
+                                                    if (DateTime.TryParseExact(alinmaTarihi, "dd.MM.yyyy", null, System.Globalization.DateTimeStyles.None, out DateTime alinmaD))
+                                                    {
+                                                        int gun = (DateTime.Now - alinmaD).Days;
+                                                        string badgeColor = gun >= 7 ? "#f87171" : gun >= 3 ? "#fb923c" : "#4ade80";
+                                                        beklemeBadge = $"<span class='tag' style='border-color:{badgeColor};color:{badgeColor};'>⏳ {gun} gündür bekliyor</span>";
+                                                    }
+
+                                                    // WA şablonları
+                                                    string cihazAdi = r["imei"]?.ToString() ?? "";
+                                                    string waHazir = HttpUtility.UrlEncode($"Merhaba, Çalkan GSM'den yazıyoruz. {cihazAdi} cihazınızın tamiri tamamlandı, teslim alabilirsiniz. İyi günler 🙂");
+                                                    string waParca = HttpUtility.UrlEncode($"Merhaba, Çalkan GSM'den yazıyoruz. {cihazAdi} cihazınız için gerekli parça temin ediliyor, tahmini süre hakkında sizi bilgilendireceğiz.");
+                                                    string waFiyat = HttpUtility.UrlEncode($"Merhaba, Çalkan GSM'den yazıyoruz. {cihazAdi} cihazınız incelendi. Tamir ücreti {r["satis_fiyati"]} TL olacaktır. Onayınız halinde işleme başlayabiliriz.");
 
                                                     sb.Append("<div class='shop-row row-tamir'>");
                                                     sb.Append("<div class='row-header'>");
@@ -798,19 +810,25 @@ namespace CalkanGsmWeb
                                                     sb.AppendFormat("<div class='row-price'>{0} TL</div>", r["satis_fiyati"]);
                                                     sb.Append("</div>");
                                                     sb.Append("<div class='tags'>");
-                                                    sb.AppendFormat("<span class='tag active'>📱 {0} {1}</span>", r["imei"], r["alinma_tarihi"]);
+                                                    sb.AppendFormat("<span class='tag active'>📱 {0}</span>", r["imei"]);
+                                                    sb.AppendFormat("<span class='tag'>📅 Kabul: {0}</span>", alinmaTarihi);
                                                     sb.AppendFormat("<span class='tag'>📞 {0}</span>", rawPhone);
-                                                    sb.AppendFormat("<span class='tag'>🛠️ İşlem: {0}</span>", r["fiyat"]);
+                                                    sb.AppendFormat("<span class='tag'>🛠️ {0}</span>", r["fiyat"]);
+                                                    if (!string.IsNullOrEmpty(beklemeBadge)) sb.Append(beklemeBadge);
                                                     sb.Append("</div>");
-                                                    sb.AppendFormat("<div class='row-notes'><strong>Arıza Durum Notu:</strong> {0}</div>", r["kutu_fatura"]);
+                                                    sb.AppendFormat("<div class='row-notes'><strong>Arıza Notu:</strong> {0}</div>", r["kutu_fatura"]);
 
-                                                    sb.Append("<div class='row-actions'>");
-                                                    sb.AppendFormat("<a href='{0}' target='_blank' class='action-btn btn-whatsapp'>💬 WhatsApp Bildir</a>", waLink);
-
+                                                    sb.Append("<div class='row-actions' style='flex-wrap:wrap; gap:8px;'>");
+                                                    sb.AppendFormat("<a href='/duzenle?id={0}&tip=tamir' class='action-btn btn-secondary' style='padding:8px 14px; font-size:13px;'>✏️ Düzenle</a>", r["id"]);
+                                                    sb.Append("<div style='display:flex; gap:6px; flex-wrap:wrap;'>");
+                                                    sb.AppendFormat("<a href='https://wa.me/{0}?text={1}' target='_blank' class='action-btn btn-whatsapp' style='padding:8px 12px; font-size:12px;'>✅ Hazır</a>", cleanPhone, waHazir);
+                                                    sb.AppendFormat("<a href='https://wa.me/{0}?text={1}' target='_blank' class='action-btn btn-secondary' style='padding:8px 12px; font-size:12px; border-color:#fb923c; color:#fb923c;'>📦 Parça</a>", cleanPhone, waParca);
+                                                    sb.AppendFormat("<a href='https://wa.me/{0}?text={1}' target='_blank' class='action-btn btn-secondary' style='padding:8px 12px; font-size:12px;'>💰 Fiyat</a>", cleanPhone, waFiyat);
+                                                    sb.Append("</div>");
                                                     sb.Append("<form action='/sil' method='POST' style='margin:0;'>");
                                                     sb.AppendFormat("<input type='hidden' name='id' value='{0}'>", r["id"]);
                                                     sb.Append("<input type='hidden' name='git' value='tamir'>");
-                                                    sb.Append("<button type='submit' class='action-btn btn-success'>Teslim Et ve Arşivle</button>");
+                                                    sb.Append("<button type='submit' class='action-btn btn-success' style='padding:8px 14px; font-size:13px;'>📬 Teslim Et</button>");
                                                     sb.Append("</form></div></div>");
                                                 }
                                             }
@@ -916,11 +934,13 @@ namespace CalkanGsmWeb
                                                     sb.AppendFormat("<div style='font-size:12px; color:var(--muted); font-family:monospace; padding-left:4px;'>Dükkan Maliyeti: {0} TL</div>", r["fiyat"]);
                                                     sb.Append("<div class='row-actions'>");
                                                     sb.Append("<span style='font-size:12px; color:var(--accent); font-weight:600;'>DURUM: VİTRİNDE</span>");
-                                                    sb.Append("<form action='/sil' method='POST'>");
+                                                    sb.Append("<div style='display:flex; gap:8px;'>");
+                                                    sb.AppendFormat("<a href='/duzenle?id={0}&tip=vitrin' class='action-btn btn-secondary' style='padding:8px 14px; font-size:13px;'>✏️ Düzenle</a>", r["id"]);
+                                                    sb.Append("<form action='/sil' method='POST' style='margin:0;'>");
                                                     sb.AppendFormat("<input type='hidden' name='id' value='{0}'>", r["id"]);
                                                     sb.Append("<input type='hidden' name='git' value='vitrin'>");
                                                     sb.Append("<button type='submit' class='action-btn btn-submit' style='padding:8px 20px; width:auto; margin:0;'>Cihazı Sat</button>");
-                                                    sb.Append("</form></div></div>");
+                                                    sb.Append("</form></div></div></div>");
                                                 }
                                             }
                                         }
@@ -963,8 +983,11 @@ namespace CalkanGsmWeb
                                                     sb.AppendFormat("<div class='row-price' style='color:var(--green);'>{0} TL</div>", r["satis_fiyati"]);
                                                     sb.Append("</div>");
                                                     sb.Append("<div class='tags'>");
-                                                    sb.AppendFormat("<span class='tag'>{0} {1}</span>", r["imei"], r["alinma_tarihi"]);
+                                                    sb.AppendFormat("<span class='tag'>📱 {0}</span>", r["imei"]);
+                                                    sb.AppendFormat("<span class='tag'>📅 Kabul: {0}</span>", r["alinma_tarihi"]);
                                                     sb.AppendFormat("<span class='tag'>🛠️ {0}</span>", r["fiyat"]);
+                                                    if (!string.IsNullOrEmpty(r["teslim_tarihi"]?.ToString()))
+                                                        sb.AppendFormat("<span class='tag' style='color:var(--green);border-color:var(--green);'>✅ Teslim: {0}</span>", r["teslim_tarihi"]);
                                                     sb.Append("</div>");
                                                     sb.Append("<div class='row-actions' style='margin-top:10px; padding-top:10px;'>");
                                                     sb.Append("<span style='font-size:12px; color:var(--green); font-weight:650;'>✓ TESLİM EDİLDİ</span>");
@@ -1027,6 +1050,130 @@ namespace CalkanGsmWeb
                                 sb.Append(Footer);
                                 html = sb.ToString();
                             }
+                            else if (rawUrl.StartsWith("/duzenle") && method == "GET")
+                            {
+                                var qs = HttpUtility.ParseQueryString(rawUrl.Contains("?") ? rawUrl.Substring(rawUrl.IndexOf('?') + 1) : "");
+                                string editId = qs["id"] ?? "";
+                                string tip = qs["tip"] ?? "tamir";
+                                try
+                                {
+                                    using (var connection = new SqliteConnection(connStr))
+                                    {
+                                        connection.Open();
+                                        using (var cmd = new SqliteCommand("SELECT * FROM vitrin WHERE id=@id;", connection))
+                                        {
+                                            cmd.Parameters.AddWithValue("@id", editId);
+                                            using (var r = cmd.ExecuteReader())
+                                            {
+                                                if (!r.Read())
+                                                {
+                                                    html = GetHeader("Kayit Bulunamadi", tip == "tamir" ? "/tamir_listele" : "/vitrin_listele", "Geri") +
+                                                           "<div class='alert alert-err'>Kayit bulunamadi.</div>" + Footer;
+                                                }
+                                                else if (tip == "tamir")
+                                                {
+                                                    string imeiVal = r["imei"]?.ToString() ?? "";
+                                                    int spIdx = imeiVal.IndexOf(' ');
+                                                    string cMarka = spIdx > 0 ? imeiVal.Substring(0, spIdx) : imeiVal;
+                                                    string cModel = spIdx > 0 ? imeiVal.Substring(spIdx + 1) : "";
+                                                    html = GetHeader("Tamir Kaydini Duzenle", "/tamir_listele", "Tamir Listesi") +
+                                                           "<div class='form-box'><form action='/duzenle_kaydet' method='POST'>" +
+                                                           "<input type='hidden' name='id' value='" + editId + "'>" +
+                                                           "<input type='hidden' name='tip' value='tamir'>" +
+                                                           "<div class='form-field'><label>Musteri Adi Soyadi</label><input type='text' name='musteri' class='form-input' value='" + System.Web.HttpUtility.HtmlEncode(r["marka"]?.ToString() ?? "") + "' required autocomplete='off'></div>" +
+                                                           "<div class='form-field'><label>Musteri Telefon</label><input type='text' name='telefon' class='form-input' value='" + System.Web.HttpUtility.HtmlEncode(r["model"]?.ToString() ?? "") + "' required autocomplete='off'></div>" +
+                                                           "<div class='form-field'><label>Cihaz Markasi</label><input type='text' name='c_marka' class='form-input' value='" + System.Web.HttpUtility.HtmlEncode(cMarka) + "' required autocomplete='off'></div>" +
+                                                           "<div class='form-field'><label>Cihaz Modeli</label><input type='text' name='c_model' class='form-input' value='" + System.Web.HttpUtility.HtmlEncode(cModel) + "' autocomplete='off'></div>" +
+                                                           "<div class='form-field'><label>Yapilan Islem</label><input type='text' name='islem' class='form-input' value='" + System.Web.HttpUtility.HtmlEncode(r["fiyat"]?.ToString() ?? "") + "' required autocomplete='off'></div>" +
+                                                           "<div class='form-field'><label>Tamir Ucreti (TL)</label><input type='text' name='t_fiyat' class='form-input' value='" + System.Web.HttpUtility.HtmlEncode(r["satis_fiyati"]?.ToString() ?? "") + "' required autocomplete='off'></div>" +
+                                                           "<div class='form-field'><label>Ariza / Kozmetik Notu</label><input type='text' name='ariza' class='form-input' value='" + System.Web.HttpUtility.HtmlEncode(r["kutu_fatura"]?.ToString() ?? "") + "' required autocomplete='off'></div>" +
+                                                           "<button type='submit' class='action-btn btn-submit'>Degisiklikleri Kaydet</button>" +
+                                                           "</form></div>" + Footer;
+                                                }
+                                                else
+                                                {
+                                                    string markaVal = r["marka"]?.ToString() ?? "";
+                                                    string[] mp = markaVal.Split('|');
+                                                    string vGb   = mp.Length > 0 ? mp[0].Trim() : "";
+                                                    string vRenk = mp.Length > 1 ? mp[1].Trim() : "";
+                                                    string vPil  = mp.Length > 2 ? mp[2].Replace("Pil:", "").Trim() : "";
+                                                    html = GetHeader("Vitrin Kaydini Duzenle", "/vitrin_listele", "Vitrin Listesi") +
+                                                           "<div class='form-box'><form action='/duzenle_kaydet' method='POST'>" +
+                                                           "<input type='hidden' name='id' value='" + editId + "'>" +
+                                                           "<input type='hidden' name='tip' value='vitrin'>" +
+                                                           "<div class='form-field'><label>Cihaz Markasi &amp; Modeli</label><input type='text' name='v_model' class='form-input' value='" + System.Web.HttpUtility.HtmlEncode(r["model"]?.ToString() ?? "") + "' required autocomplete='off'></div>" +
+                                                           "<div class='form-field'><label>Kapasite (GB)</label><input type='text' name='v_gb' class='form-input' value='" + System.Web.HttpUtility.HtmlEncode(vGb) + "' required autocomplete='off'></div>" +
+                                                           "<div class='form-field'><label>Kasa Rengi</label><input type='text' name='v_renk' class='form-input' value='" + System.Web.HttpUtility.HtmlEncode(vRenk) + "' required autocomplete='off'></div>" +
+                                                           "<div class='form-field'><label>Pil Yuzdesi</label><input type='text' name='v_pil' class='form-input' value='" + System.Web.HttpUtility.HtmlEncode(vPil) + "' required autocomplete='off'></div>" +
+                                                           "<div class='form-field'><label>Garanti Durumu</label><input type='text' name='v_garanti' class='form-input' value='" + System.Web.HttpUtility.HtmlEncode(r["garanti"]?.ToString() ?? "") + "' required autocomplete='off'></div>" +
+                                                           "<div class='form-field'><label>IMEI Numarasi</label><input type='text' name='v_imei' class='form-input' value='" + System.Web.HttpUtility.HtmlEncode(r["imei"]?.ToString() ?? "") + "' autocomplete='off'></div>" +
+                                                           "<div class='form-field'><label>Alis Fiyati / Maliyet (TL)</label><input type='text' name='v_alis' class='form-input' value='" + System.Web.HttpUtility.HtmlEncode(r["fiyat"]?.ToString() ?? "") + "' autocomplete='off'></div>" +
+                                                           "<div class='form-field'><label>Satis Fiyati (TL)</label><input type='text' name='v_satis' class='form-input' value='" + System.Web.HttpUtility.HtmlEncode(r["satis_fiyati"]?.ToString() ?? "") + "' required autocomplete='off'></div>" +
+                                                           "<div class='form-field'><label>Kutu / Fatura / Aksesuar</label><input type='text' name='v_kutu' class='form-input' value='" + System.Web.HttpUtility.HtmlEncode(r["kutu_fatura"]?.ToString() ?? "") + "' autocomplete='off'></div>" +
+                                                           "<button type='submit' class='action-btn btn-submit'>Degisiklikleri Kaydet</button>" +
+                                                           "</form></div>" + Footer;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    html = GetHeader("Hata", "/", "Ana Menu") + "<div class='alert alert-err'>" + ex.Message + "</div>" + Footer;
+                                }
+                            }
+                            else if (rawUrl == "/duzenle_kaydet" && method == "POST")
+                            {
+                                string body = new StreamReader(request.InputStream, request.ContentEncoding).ReadToEnd();
+                                var nv = HttpUtility.ParseQueryString(body);
+                                string editId = nv["id"] ?? "";
+                                string tip = nv["tip"] ?? "tamir";
+                                try
+                                {
+                                    using (var connection = new SqliteConnection(connStr))
+                                    {
+                                        connection.Open();
+                                        if (tip == "tamir")
+                                        {
+                                            using (var cmd = new SqliteCommand("UPDATE vitrin SET marka=@marka, model=@model, imei=@imei, fiyat=@fiyat, satis_fiyati=@satis, kutu_fatura=@kutu WHERE id=@id;", connection))
+                                            {
+                                                cmd.Parameters.AddWithValue("@marka", nv["musteri"] ?? "");
+                                                cmd.Parameters.AddWithValue("@model", nv["telefon"] ?? "");
+                                                cmd.Parameters.AddWithValue("@imei", ((nv["c_marka"] ?? "") + " " + (nv["c_model"] ?? "")).Trim());
+                                                cmd.Parameters.AddWithValue("@fiyat", nv["islem"] ?? "");
+                                                cmd.Parameters.AddWithValue("@satis", nv["t_fiyat"] ?? "");
+                                                cmd.Parameters.AddWithValue("@kutu", nv["ariza"] ?? "");
+                                                cmd.Parameters.AddWithValue("@id", editId);
+                                                cmd.ExecuteNonQuery();
+                                            }
+                                        }
+                                        else
+                                        {
+                                            string birlesik = string.Format("{0} | {1} | Pil: {2}", nv["v_gb"] ?? "", nv["v_renk"] ?? "", nv["v_pil"] ?? "");
+                                            using (var cmd = new SqliteCommand("UPDATE vitrin SET model=@model, marka=@marka, imei=@imei, fiyat=@fiyat, satis_fiyati=@satis, kutu_fatura=@kutu, garanti=@garanti WHERE id=@id;", connection))
+                                            {
+                                                cmd.Parameters.AddWithValue("@model", nv["v_model"] ?? "");
+                                                cmd.Parameters.AddWithValue("@marka", birlesik);
+                                                cmd.Parameters.AddWithValue("@imei", nv["v_imei"] ?? "");
+                                                cmd.Parameters.AddWithValue("@fiyat", nv["v_alis"] ?? "");
+                                                cmd.Parameters.AddWithValue("@satis", nv["v_satis"] ?? "");
+                                                cmd.Parameters.AddWithValue("@kutu", nv["v_kutu"] ?? "");
+                                                cmd.Parameters.AddWithValue("@garanti", nv["v_garanti"] ?? "");
+                                                cmd.Parameters.AddWithValue("@id", editId);
+                                                cmd.ExecuteNonQuery();
+                                            }
+                                        }
+                                    }
+                                    response.StatusCode = 302;
+                                    response.Headers.Add("Location", tip == "tamir" ? "/tamir_listele" : "/vitrin_listele");
+                                    response.OutputStream.Close();
+                                    return;
+                                }
+                                catch (Exception ex)
+                                {
+                                    html = GetHeader("Kaydetme Hatasi", "/", "Ana Menu") + "<div class='alert alert-err'>" + ex.Message + "</div>" + Footer;
+                                }
+                            }
                             else if (rawUrl.StartsWith("/sil") && method == "POST")
                             {
                                 string body = new StreamReader(request.InputStream).ReadToEnd();
@@ -1051,9 +1198,11 @@ namespace CalkanGsmWeb
                                         else
                                         {
                                             string yeniDurum = (git == "tamir") ? "TESLIM_EDILDI" : "SATILDI";
-                                            using (var command = new SqliteCommand("UPDATE vitrin SET durum = @durum WHERE id = @id;", connection))
+                                            string teslimTarihi = DateTime.Now.ToString("dd.MM.yyyy");
+                                            using (var command = new SqliteCommand("UPDATE vitrin SET durum = @durum, teslim_tarihi = @teslim WHERE id = @id;", connection))
                                             {
                                                 command.Parameters.AddWithValue("@durum", yeniDurum);
+                                                command.Parameters.AddWithValue("@teslim", teslimTarihi);
                                                 command.Parameters.AddWithValue("@id", id);
                                                 command.ExecuteNonQuery();
                                             }
@@ -1098,10 +1247,15 @@ namespace CalkanGsmWeb
                 using (var connection = new SqliteConnection(connStr))
                 {
                     connection.Open();
-                    using (var command = new SqliteCommand("CREATE TABLE IF NOT EXISTS vitrin (id INTEGER PRIMARY KEY AUTOINCREMENT, marka TEXT, model TEXT, imei TEXT, alinma_tarihi TEXT, fiyat TEXT, satis_fiyati TEXT, durum TEXT, kutu_fatura TEXT, garanti TEXT);", connection))
+                    using (var command = new SqliteCommand("CREATE TABLE IF NOT EXISTS vitrin (id INTEGER PRIMARY KEY AUTOINCREMENT, marka TEXT, model TEXT, imei TEXT, alinma_tarihi TEXT, fiyat TEXT, satis_fiyati TEXT, durum TEXT, kutu_fatura TEXT, garanti TEXT, teslim_tarihi TEXT);", connection))
                     {
                         command.ExecuteNonQuery();
                     }
+                    // Eski DB'de kolon yoksa ekle (migration)
+                    try {
+                        using (var altCmd = new SqliteCommand("ALTER TABLE vitrin ADD COLUMN teslim_tarihi TEXT;", connection))
+                            altCmd.ExecuteNonQuery();
+                    } catch { /* zaten varsa hata yok */ }
                 }
             }
             catch (Exception ex) { Console.WriteLine("❌ Veritabanı Tablo Hatası: " + ex.Message); }
