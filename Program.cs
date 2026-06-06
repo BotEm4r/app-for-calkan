@@ -993,12 +993,11 @@ namespace CalkanGsmWeb
                                                     sb.Append("</div>");
                                                     sb.Append("<div class='row-actions' style='margin-top:10px; padding-top:10px;'>");
                                                     sb.Append("<span style='font-size:12px; color:var(--green); font-weight:650;'>✓ TESLİM EDİLDİ</span>");
-                                                    sb.Append("<form action='/sil' method='POST' onsubmit=\"return confirm('Bu arşiv kaydını veritabanından tamamen silmek istediğinize emin misiniz?');\">");
+                                                    sb.Append("<form action='/sil' method='POST' onsubmit=\"return confirm('Silmek istediginize emin misiniz?');\">");
                                                     sb.AppendFormat("<input type='hidden' name='id' value='{0}'>", r["id"]);
                                                     sb.Append("<input type='hidden' name='git' value='arsiv'>");
                                                     sb.Append("<button type='submit' class='action-btn btn-danger' style='padding:6px 14px; font-size:12px;'>Kayıt Sil</button>");
                                                     sb.Append("</form></div></div>");
-                                                    sb.Append("</div>");
                                                 }
                                             }
                                         }
