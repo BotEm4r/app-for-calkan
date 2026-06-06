@@ -928,6 +928,8 @@ namespace CalkanGsmWeb
                                                     sb.Append("<div class='tags'>");
                                                     sb.AppendFormat("<span class='tag active'>🎨 {0}</span>", r["marka"]);
                                                     sb.AppendFormat("<span class='tag'>🆔 IMEI: {0}</span>", r["imei"]);
+                                                    if (!string.IsNullOrEmpty(r["alinma_tarihi"]?.ToString()))
+                                                        sb.AppendFormat("<span class='tag'>📅 Eklendi: {0}</span>", r["alinma_tarihi"]);
                                                     sb.AppendFormat("<span class='tag'>🛡️ Garanti: {0}</span>", r["garanti"]);
                                                     sb.AppendFormat("<span class='tag'>📦 {0}</span>", r["kutu_fatura"]);
                                                     sb.Append("</div>");
@@ -1031,6 +1033,10 @@ namespace CalkanGsmWeb
                                                     sb.Append("<div class='tags'>");
                                                     sb.AppendFormat("<span class='tag'>{0}</span>", r["marka"]);
                                                     sb.AppendFormat("<span class='tag'>IMEI: {0}</span>", r["imei"]);
+                                                    if (!string.IsNullOrEmpty(r["alinma_tarihi"]?.ToString()))
+                                                        sb.AppendFormat("<span class='tag'>📅 Eklendi: {0}</span>", r["alinma_tarihi"]);
+                                                    if (!string.IsNullOrEmpty(r["teslim_tarihi"]?.ToString()))
+                                                        sb.AppendFormat("<span class='tag' style='color:var(--green);border-color:var(--green);'>💰 Satış: {0}</span>", r["teslim_tarihi"]);
                                                     sb.Append("</div>");
                                                     sb.Append("<div class='row-actions' style='margin-top:10px; padding-top:10px;'>");
                                                     sb.Append("<span style='font-size:12px; color:var(--accent); font-weight:650;'>💰 SATILDI</span>");
