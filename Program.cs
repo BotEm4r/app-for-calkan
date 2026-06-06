@@ -729,7 +729,7 @@ namespace CalkanGsmWeb
                                        "<div class='form-field'><label>Yapılacak Arıza İşlemi</label><input type='text' name='islem' class='form-input' placeholder='Örn: Batarya Değişimi, Şarj Soketi' required autocomplete='off'></div>" +
                                        "<div class='form-field'><label>Alınacak Tahmini Ücret (TL)</label><input type='text' name='t_fiyat' class='form-input' placeholder='Müşteriye verilen fiyat' required autocomplete='off'></div>" +
                                        "<div class='form-field'><label>Arıza / Kozmetik Notu</label><input type='text' name='ariza' class='form-input' placeholder='Ekranda çizik var, şifre alındı vs.' required autocomplete='off'></div>" +
-                                       "<div class='form-field'><label>Tamir Durumu</label><select name='tamir_durum' class='form-input'><option value='Bekliyor'>⏳ Bekliyor</option><option value='Tamirde'>🔧 Tamirde</option><option value='Parça Bekleniyor'>📦 Parça Bekleniyor</option><option value='Hazır'>✅ Hazır</option></select></div>" +
+                                       "<div class='form-field'><label>Tamir Durumu</label><input type='text' name='tamir_durum' class='form-input' placeholder='Bekliyor, Tamirde, Hazır...' autocomplete='off'></div>" +
                                        "<button type='submit' class='action-btn btn-submit'>Kabulü Onayla ve Kaydet</button>" +
                                        "</form>" +
                                        "</div>" +
@@ -1124,12 +1124,7 @@ namespace CalkanGsmWeb
                                                            "<div class='form-field'><label>Yapilan Islem</label><input type='text' name='islem' class='form-input' value='" + System.Web.HttpUtility.HtmlEncode(r["fiyat"]?.ToString() ?? "") + "' required autocomplete='off'></div>" +
                                                            "<div class='form-field'><label>Tamir Ucreti (TL)</label><input type='text' name='t_fiyat' class='form-input' value='" + System.Web.HttpUtility.HtmlEncode(r["satis_fiyati"]?.ToString() ?? "") + "' required autocomplete='off'></div>" +
                                                            "<div class='form-field'><label>Ariza / Kozmetik Notu</label><input type='text' name='ariza' class='form-input' value='" + System.Web.HttpUtility.HtmlEncode(r["kutu_fatura"]?.ToString() ?? "") + "' required autocomplete='off'></div>" +
-                                                           "<div class='form-field'><label>Tamir Durumu</label><select name='tamir_durum' class='form-input'>" +
-                                                           (r["garanti"]?.ToString() == "Bekliyor"         ? "<option value='Bekliyor' selected>⏳ Bekliyor</option>" : "<option value='Bekliyor'>⏳ Bekliyor</option>") +
-                                                           (r["garanti"]?.ToString() == "Tamirde"          ? "<option value='Tamirde' selected>🔧 Tamirde</option>" : "<option value='Tamirde'>🔧 Tamirde</option>") +
-                                                           (r["garanti"]?.ToString() == "Parça Bekleniyor" ? "<option value='Parça Bekleniyor' selected>📦 Parça Bekleniyor</option>" : "<option value='Parça Bekleniyor'>📦 Parça Bekleniyor</option>") +
-                                                           (r["garanti"]?.ToString() == "Hazır"            ? "<option value='Hazır' selected>✅ Hazır</option>" : "<option value='Hazır'>✅ Hazır</option>") +
-                                                           "</select></div>" +
+                                                           "<div class='form-field'><label>Tamir Durumu</label><input type='text' name='tamir_durum' class='form-input' value='" + System.Web.HttpUtility.HtmlEncode(r["garanti"]?.ToString() ?? "Bekliyor") + "' placeholder='Bekliyor, Tamirde, Hazır...' autocomplete='off'></div>" +
                                                            "<div class='form-field'><label>Kabul Tarihi</label><input type='text' name='kabul_tarihi' class='form-input' value='" + System.Web.HttpUtility.HtmlEncode(r["alinma_tarihi"]?.ToString() ?? DateTime.Now.ToString("dd.MM.yyyy")) + "' placeholder='GG.AA.YYYY' autocomplete='off'></div>" +
                                                            "<button type='submit' class='action-btn btn-submit'>Degisiklikleri Kaydet</button>" +
                                                            "</form></div>" + Footer;
