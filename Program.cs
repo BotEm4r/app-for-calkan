@@ -152,7 +152,10 @@ namespace CalkanGsmWeb
         private static string GetCSS() => @"
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
-
+* {
+  -webkit-tap-highlight-color: transparent;
+  outline: none;
+}
   :root {
     --bg:          #0f172a;
     --surface:     #1e293b;
