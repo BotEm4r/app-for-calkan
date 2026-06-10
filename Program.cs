@@ -69,8 +69,8 @@ namespace CalkanGsmWeb
                     "# Calkan GSM - Kullanici ve Port Ayarlari\n" +
                     "# Kullanici eklemek icin KULLANICI1, KULLANICI2 ... seklinde devam ettirin\n" +
                     "# Format: KULLANICIn=kullanici_adi:sifre\n\n" +
-                    "KULLANICI1=admin:emir2626\n" +
-                    "KULLANICI2=calkanadmin:fcalkan2626\n" +
+                    "KULLANICI1=admin:DEGIS_BURAYI\n" +
+                    "KULLANICI2=admin:DEGIS_BURAYI_2\n" +
                     "PORT=2626\n");
                 Console.WriteLine("📄 config.txt bulunamadı, varsayılan dosya oluşturuldu.");
             }
@@ -607,7 +607,7 @@ namespace CalkanGsmWeb
             }
 
             // Eger Windows uzerindeysek EXE/Görsel modda calis
-            string siteUrl = $"http://localhost:{port}/";
+            string siteUrl = $"http://*:{port}/";
 
             Thread serverThread = new Thread(() => StartServer(port));
             serverThread.IsBackground = true;
@@ -654,8 +654,13 @@ namespace CalkanGsmWeb
         private static void StartServer(string port)
         {
             HttpListener listener = new HttpListener();
-            string prefix = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? $"http://localhost:{port}/" : $"http://*:{port}/";
-            listener.Prefixes.Add(prefix);
+            string prefix = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? $"http://*:{port}/" : $"http://*:{port}/";
+            
+            string port = Environment.GetEnvironmentVariable("PORT") ?? "2626";
+            string url = $"http://*:{port}/";
+            listener.Prefixes.Add(url);
+            Console.WriteLine($"🚀 Sunucu aktif: {url}");
+
 
             try
             {
@@ -832,7 +837,7 @@ namespace CalkanGsmWeb
                                     using (var connection = new SqliteConnection(connStr))
                                     {
                                         connection.Open();
-                    using (var cmd = new SqliteCommand("CREATE TABLE IF NOT EXISTS kasa_defteri (id INTEGER PRIMARY KEY AUTOINCREMENT, tarih TEXT, tur TEXT, aciklama TEXT, maliyet TEXT, tutar TEXT);", connection)) { cmd.ExecuteNonQuery(); }
+                    
                     
                                         string query = "INSERT INTO vitrin (marka, model, imei, alinma_tarihi, fiyat, satis_fiyati, durum, kutu_fatura, garanti) VALUES (@marka, @model, @imei, @alinma, @fiyat, @satis, @durum, @kutu, @garanti);";
                                         using (var command = new SqliteCommand(query, connection))
@@ -872,7 +877,7 @@ namespace CalkanGsmWeb
                                     using (var connection = new SqliteConnection(connStr))
                                     {
                                         connection.Open();
-                    using (var cmd = new SqliteCommand("CREATE TABLE IF NOT EXISTS kasa_defteri (id INTEGER PRIMARY KEY AUTOINCREMENT, tarih TEXT, tur TEXT, aciklama TEXT, maliyet TEXT, tutar TEXT);", connection)) { cmd.ExecuteNonQuery(); }
+                    
                     
                                         using (var cmd = new SqliteCommand("SELECT * FROM vitrin WHERE durum='TAMIR' ORDER BY id DESC;", connection))
                                         using (var r = cmd.ExecuteReader())
@@ -976,7 +981,7 @@ namespace CalkanGsmWeb
                                     using (var connection = new SqliteConnection(connStr))
                                     {
                                         connection.Open();
-                    using (var cmd = new SqliteCommand("CREATE TABLE IF NOT EXISTS kasa_defteri (id INTEGER PRIMARY KEY AUTOINCREMENT, tarih TEXT, tur TEXT, aciklama TEXT, maliyet TEXT, tutar TEXT);", connection)) { cmd.ExecuteNonQuery(); }
+                    
                     
                                         string birlesikOzellikler = string.Format("{0} | {1} | Pil: {2}", nv["v_gb"], nv["v_renk"], nv["v_pil"]);
                                         string query = "INSERT INTO vitrin (marka, model, imei, alinma_tarihi, fiyat, satis_fiyati, durum, kutu_fatura, garanti) VALUES (@marka, @model, @imei, @alinma, @fiyat, @satis, @durum, @kutu, @garanti);";
@@ -1138,6 +1143,52 @@ namespace CalkanGsmWeb
                                 response.OutputStream.Close(); return;
                             }
 
+                            
+                            else if (rawUrl == "/kasa_defteri")
+                            {
+                                StringBuilder rows = new StringBuilder();
+                                double toplamGelir = 0; double toplamGider = 0;
+                                try {
+                                    using (var conn = new SqliteConnection(connStr)) {
+                                        conn.Open();
+                                        using (var cmd = new SqliteCommand("SELECT * FROM kasa_defteri ORDER BY id DESC LIMIT 100", conn)) {
+                                            using (var r = cmd.ExecuteReader()) {
+                                                while (r.Read()) {
+                                                    string t = r["tur"].ToString();
+                                                    double tutar = 0; double.TryParse(r["tutar"].ToString(), out tutar);
+                                                    double maliyet = 0; double.TryParse(r["maliyet"].ToString(), out maliyet);
+                                                    if (t == "GIDER") toplamGider += tutar; 
+                                                    else if (t == "DEVIR") { /* Devir kar degil */ }
+                                                    else toplamGelir += (tutar - maliyet);
+                                                    rows.Append($"<tr class='shop-row'><td>{r["tarih"]}</td><td><b>{t}</b></td><td>{r["aciklama"]}</td><td>{maliyet} ₺</td><td>{tutar} ₺</td></tr>");
+                                                }
+                                            }
+                                        }
+                                    }
+                                } catch {}
+
+                                html = GetHeader("Kasa Defteri", "/", "Ana Menü") + 
+                                    "<div class='form-box' style='margin-bottom:20px;'>" +
+                                    "  <div class='defter-row'>" +
+                                    "    <div class='defter-card'><label>GÜN BAŞI DEVİR</label><form action='/kasa_kaydet' method='POST'><div class='input-pair'><input type='text' name='aciklama' value='Devir' readonly><input type='number' name='tutar' placeholder='Tutar' required></div><input type='hidden' name='tur' value='DEVIR'><button class='btn-kasa'>DEVİR KAYDET</button></form></div>" +
+                                    "    <div class='defter-card'><label>AKSESUAR / GİDER</label><form action='/kasa_kaydet' method='POST'><div class='input-pair'><input type='text' name='aciklama' placeholder='Ürün/Not' required><input type='number' name='tutar' placeholder='Tutar' required></div><select name='tur' class='form-input' style='margin-top:10px;'><option value='AKSESUAR'>Aksesuar Satış</option><option value='GIDER'>Ödeme Çıkış</option></select><button class='btn-kasa'>KAYDET</button></form></div>" +
+                                    "  </div>" +
+                                    "  <div class='defter-card' style='margin-top:20px;'><label>TAMİR GİRİŞİ (ÜÇLÜ KUTU)</label><form action='/kasa_kaydet' method='POST'><div class='input-triple'><input type='text' name='aciklama' placeholder='Yapılan İşlem' required><input type='number' name='maliyet' placeholder='Maliyet' required><input type='number' name='tutar' placeholder='Satış Fiyatı' required></div><input type='hidden' name='tur' value='TAMIR'><button class='btn-kasa'>TAMİRİ KAYDET</button></form></div>" +
+                                    "</div>" +
+                                    "<div class='stats-grid' style='grid-template-columns:1fr 1fr; gap:15px; margin-bottom:20px;'>" +
+                                    $"<div class='stat-card'><div class='stat-val' style='color:var(--green)'>{toplamGelir} ₺</div><div class='stat-lbl'>TOPLAM KÂR</div></div>" +
+                                    $"<div class='stat-card'><div class='stat-val' style='color:var(--accent)'>{toplamGelir - toplamGider} ₺</div><div class='stat-lbl'>KASADAKİ NET</div></div>" +
+                                    "</div>" +
+                                    "<table style='width:100%; color:white; border-collapse:collapse;'><thead><tr style='text-align:left; color:var(--muted);'><th>Tarih</th><th>Tür</th><th>Açıklama</th><th>Maliyet</th><th>Tutar</th></tr></thead><tbody>" + rows.ToString() + "</tbody></table>" + Footer;
+                            }
+                            else if (rawUrl == "/kasa_kaydet" && method == "POST") {
+                                var bodyReader = new StreamReader(request.InputStream).ReadToEnd();
+                                var nv = HttpUtility.ParseQueryString(bodyReader);
+                                KasaKaydet(nv["tur"], nv["aciklama"], nv["maliyet"] ?? "0", nv["tutar"]);
+                                response.StatusCode = 302; response.Headers.Add("Location", "/kasa_defteri");
+                                response.OutputStream.Close(); return;
+                            }
+
                             else if (rawUrl == "/vitrin_listele")
                             {
                                 var sb = new StringBuilder();
@@ -1149,7 +1200,7 @@ namespace CalkanGsmWeb
                                     using (var connection = new SqliteConnection(connStr))
                                     {
                                         connection.Open();
-                    using (var cmd = new SqliteCommand("CREATE TABLE IF NOT EXISTS kasa_defteri (id INTEGER PRIMARY KEY AUTOINCREMENT, tarih TEXT, tur TEXT, aciklama TEXT, maliyet TEXT, tutar TEXT);", connection)) { cmd.ExecuteNonQuery(); }
+                    
                     
                                         using (var cmd = new SqliteCommand("SELECT * FROM vitrin WHERE durum='VITRIN' ORDER BY id DESC;", connection))
                                         using (var r = cmd.ExecuteReader())
@@ -1210,7 +1261,7 @@ namespace CalkanGsmWeb
                                     using (var connection = new SqliteConnection(connStr))
                                     {
                                         connection.Open();
-                    using (var cmd = new SqliteCommand("CREATE TABLE IF NOT EXISTS kasa_defteri (id INTEGER PRIMARY KEY AUTOINCREMENT, tarih TEXT, tur TEXT, aciklama TEXT, maliyet TEXT, tutar TEXT);", connection)) { cmd.ExecuteNonQuery(); }
+                    
                     
                                         using (var cmd = new SqliteCommand("SELECT * FROM vitrin WHERE durum='TESLIM_EDILDI' ORDER BY id DESC;", connection))
                                         using (var r = cmd.ExecuteReader())
@@ -1257,7 +1308,7 @@ namespace CalkanGsmWeb
                                     using (var connection = new SqliteConnection(connStr))
                                     {
                                         connection.Open();
-                    using (var cmd = new SqliteCommand("CREATE TABLE IF NOT EXISTS kasa_defteri (id INTEGER PRIMARY KEY AUTOINCREMENT, tarih TEXT, tur TEXT, aciklama TEXT, maliyet TEXT, tutar TEXT);", connection)) { cmd.ExecuteNonQuery(); }
+                    
                     
                                         using (var cmd = new SqliteCommand("SELECT * FROM vitrin WHERE durum='SATILDI' ORDER BY id DESC;", connection))
                                         using (var r = cmd.ExecuteReader())
@@ -1329,7 +1380,7 @@ namespace CalkanGsmWeb
                                     using (var connection = new SqliteConnection(connStr))
                                     {
                                         connection.Open();
-                    using (var cmd = new SqliteCommand("CREATE TABLE IF NOT EXISTS kasa_defteri (id INTEGER PRIMARY KEY AUTOINCREMENT, tarih TEXT, tur TEXT, aciklama TEXT, maliyet TEXT, tutar TEXT);", connection)) { cmd.ExecuteNonQuery(); }
+                    
                     
                                         using (var cmd = new SqliteCommand("SELECT * FROM vitrin WHERE id=@id;", connection))
                                         {
@@ -1419,7 +1470,7 @@ namespace CalkanGsmWeb
                                     using (var connection = new SqliteConnection(connStr))
                                     {
                                         connection.Open();
-                    using (var cmd = new SqliteCommand("CREATE TABLE IF NOT EXISTS kasa_defteri (id INTEGER PRIMARY KEY AUTOINCREMENT, tarih TEXT, tur TEXT, aciklama TEXT, maliyet TEXT, tutar TEXT);", connection)) { cmd.ExecuteNonQuery(); }
+                    
                     
                                         if (tip == "tamir")
                                         {
@@ -1492,7 +1543,7 @@ namespace CalkanGsmWeb
                                     using (var connection = new SqliteConnection(connStr))
                                     {
                                         connection.Open();
-                    using (var cmd = new SqliteCommand("CREATE TABLE IF NOT EXISTS kasa_defteri (id INTEGER PRIMARY KEY AUTOINCREMENT, tarih TEXT, tur TEXT, aciklama TEXT, maliyet TEXT, tutar TEXT);", connection)) { cmd.ExecuteNonQuery(); }
+                    
                     
 
                                         if (git == "arsiv")
@@ -1556,7 +1607,7 @@ namespace CalkanGsmWeb
             try {
                 using (var connection = new SqliteConnection(connStr)) {
                     connection.Open();
-                    using (var cmd = new SqliteCommand("CREATE TABLE IF NOT EXISTS kasa_defteri (id INTEGER PRIMARY KEY AUTOINCREMENT, tarih TEXT, tur TEXT, aciklama TEXT, maliyet TEXT, tutar TEXT);", connection)) { cmd.ExecuteNonQuery(); }
+                    
                     
                     using (var cmd = new SqliteCommand("SELECT fiyat, satis_fiyati, durum FROM vitrin", connection)) {
                         using (var reader = cmd.ExecuteReader()) {
@@ -1582,6 +1633,12 @@ namespace CalkanGsmWeb
 
 
         
+        
+                }
+            } catch {}
+        }
+
+        
         private static void KasaKaydet(string tur, string aciklama, string maliyet, string tutar) {
             try {
                 using (var conn = new SqliteConnection(connStr)) {
@@ -1599,17 +1656,19 @@ namespace CalkanGsmWeb
         }
 
         private static void TabloyuHazirla() {
-            try
-            {
-                using (var connection = new SqliteConnection(connStr))
-                {
+            try {
+                using (var connection = new SqliteConnection(connStr)) {
                     connection.Open();
                     using (var cmd = new SqliteCommand("CREATE TABLE IF NOT EXISTS kasa_defteri (id INTEGER PRIMARY KEY AUTOINCREMENT, tarih TEXT, tur TEXT, aciklama TEXT, maliyet TEXT, tutar TEXT);", connection)) { cmd.ExecuteNonQuery(); }
-                    
-                    using (var command = new SqliteCommand("CREATE TABLE IF NOT EXISTS vitrin (id INTEGER PRIMARY KEY AUTOINCREMENT, marka TEXT, model TEXT, imei TEXT, alinma_tarihi TEXT, fiyat TEXT, satis_fiyati TEXT, durum TEXT, kutu_fatura TEXT, garanti TEXT, teslim_tarihi TEXT, notlar TEXT);", connection))
-                    {
-                        command.ExecuteNonQuery();
-                    }
+                    using (var command = new SqliteCommand("CREATE TABLE IF NOT EXISTS vitrin (id INTEGER PRIMARY KEY AUTOINCREMENT, marka TEXT, model TEXT, imei TEXT, alinma_tarihi TEXT, fiyat TEXT, satis_fiyati TEXT, durum TEXT, kutu_fatura TEXT, garanti TEXT, teslim_tarihi TEXT, notlar TEXT);", connection)) { command.ExecuteNonQuery(); }
+                    try {
+                        using (var altCmd = new SqliteCommand("ALTER TABLE vitrin ADD COLUMN teslim_tarihi TEXT;", connection))
+                            altCmd.ExecuteNonQuery();
+                    } catch { }
+                }
+            } catch (Exception ex) { Console.WriteLine("❌ Veritabanı Hatası: " + ex.Message); }
+        }
+
                     // Eski DB'de kolon yoksa ekle (migration)
                     try {
                         using (var altCmd = new SqliteCommand("ALTER TABLE vitrin ADD COLUMN teslim_tarihi TEXT;", connection))
@@ -1617,8 +1676,6 @@ namespace CalkanGsmWeb
                     } catch { /* zaten varsa hata yok */ }
                 }
             }
-            catch (Exception ex) { Console.WriteLine("❌ Veritabanı Tablo Hatası: " + ex.Message); }
-        }
+            catch (Exception ex) { Console.WriteLine("❌ Veritabanı Tablo Hatası: " + ex.Message);
     }
 }
-
