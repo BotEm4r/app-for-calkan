@@ -12,14 +12,11 @@ namespace CalkanGsmWeb
 {
     class Program
     {
-        // Linux ile uyumlu klasör dizini
         private static string BaseDir = AppContext.BaseDirectory;
         private static string dbPath = Path.Combine(BaseDir, "data", "calkan_gsm.db");
         private static string connStr => $"Data Source={dbPath};";
 
         private static Dictionary<string, string> Kullanicilar = new Dictionary<string, string>();
-        
-        // GÜVENLİK: Çalınmaya karşı rastgele dinamik oturum anahtarı
         private static string SessionValue = Environment.GetEnvironmentVariable("SESSION_SECRET") ?? Guid.NewGuid().ToString("N");
 
         private static ConcurrentDictionary<string, (int count, DateTime lockUntil)> loginAttempts = new();
@@ -29,12 +26,10 @@ namespace CalkanGsmWeb
         private const int MAX_RPS = 25;
         private const int MAX_BODY_BYTES = 10240;
 
-        // İstediğin gibi varsayılan port
         private static string configPort = "8080";
 
         private static void ConfigYukle()
         {
-            // ── 1. ADIM: RAILWAY ORTAM DEĞİŞKENLERİNE BAK ──────────────────────────
             bool railwayKullaniciBulundu = false;
             for (int i = 1; i <= 20; i++)
             {
@@ -58,7 +53,6 @@ namespace CalkanGsmWeb
                 return;
             }
 
-            // ── 2. ADIM: LOCALDEKİ CONFIG.TXT'YE BAK ────────────────────────────────
             string configPath = Path.Combine(BaseDir, "config.txt");
             if (!File.Exists(configPath))
             {
@@ -154,7 +148,6 @@ namespace CalkanGsmWeb
   -webkit-tap-highlight-color: transparent;
   outline: none;
 }
-  /* Tarayici varsayilan sifre goster ikonunu gizle */
   input::-ms-reveal,
   input::-ms-clear { display: none; }
 
@@ -304,7 +297,6 @@ namespace CalkanGsmWeb
   .form-input:focus { border-color: var(--accent); }
   select.form-input { cursor: pointer; }
 
-  /* Şifre alanı wrapper */
   .password-wrapper {
     position: relative;
     display: flex;
@@ -429,6 +421,11 @@ namespace CalkanGsmWeb
   .btn-submit:hover { opacity: 0.9; }
   .btn-secondary { background: transparent; border: 1px solid var(--border); color: var(--text); }
   .btn-secondary:hover { background: var(--border); }
+  
+  /* İSTEDİĞİN MAVİ OUTLINE TASARIMLI BUTON SILLERI */
+  .btn-outline-blue { background: transparent; border: 2px solid var(--accent); color: var(--accent); }
+  .btn-outline-blue:hover { background: rgba(56, 189, 248, 0.1); }
+  
   .btn-success { background: var(--green); color: #fff; }
   .btn-success:hover { opacity: 0.9; }
   .btn-whatsapp { background: var(--whatsapp); color: #fff; gap: 6px; }
@@ -521,7 +518,7 @@ namespace CalkanGsmWeb
             svg.appendChild(p2);
             var c = document.createElementNS('http://www.w3.org/2000/svg','circle');
             c.setAttribute('stroke','currentColor'); c.setAttribute('stroke-width','2');
-            c.setAttribute('cx','12'); c.setAttribute('cy','12'); c.setAttribute('r','3');
+            c.setAttribute('cx','12'); c.setAttribute('cy','12'); r='3';
             svg.appendChild(c);
         }
     }
@@ -567,19 +564,15 @@ namespace CalkanGsmWeb
                 
             TabloyuHazirla();
 
-            // Linux ortamı için sadece konsolda sunucuyu başlatıyoruz
             Console.WriteLine($"🌐 Çalkan GSM Sunucusu Başlatılıyor...");
             StartServer(configPort);
             
-            // Programın arka planda kapanmaması için sonsuz döngü
             Thread.Sleep(Timeout.Infinite);
         }
 
         private static void StartServer(string port)
         {
             HttpListener listener = new HttpListener();
-            
-            // GÜVENLİK VE RAILWAY UYUMU: Reverse Proxy için '*' kullanmak şart.
             listener.Prefixes.Add($"http://*:{port}/");
 
             try
@@ -725,10 +718,150 @@ namespace CalkanGsmWeb
                                        "  <a href='/vitrin_listele' class='menu-card'><span class='label'>Vitrin Stok Listesi</span><span class='desc'>Şu an rafta satılmayı bekleyen güncel envanter.</span></a>" +
                                        "  <a href='/arsiv_panel' class='menu-card menu-full'><span class='label'>Geçmiş İşlemler Arşivi</span><span class='desc'>Tamamlanıp teslim edilmiş tamirler ve satılmış eski cihazların dökümü.</span></a>" +
                                        "</div>" +
+                                       
+                                       // ARADIĞIN MAVİ OUTLINE TASARIMLI KASA DEFTERİ BUTONU
+                                       "<a href='/kasa_defteri' class='action-btn btn-outline-blue' style='width:100%; margin-top:24px; justify-content:center; display:flex; font-size:15px;'>📒 Aksesuar Satış &amp; Kasa Defteri</a>" +
+                                       
                                        (aktifKullanici == "admin" ? "<a href='/yedek' class='action-btn btn-secondary' style='width:100%;margin-top:16px;justify-content:center;display:flex;'>💾 Veritabanı Yedeği İndir</a>" : "") +
                                        "<a href='/logout' class='action-btn btn-close-shop'>Güvenli Çıkış (Oturumu Kapat)</a>" +
                                        Footer;
                             }
+                            
+                            // ── YENİ: KASA DEFTERİ VE AKSESUAR SATIŞ MODÜLÜ GERÇEKLEŞTİRİMİ ──────────────────
+                            else if (rawUrl == "/kasa_defteri")
+                            {
+                                var sb = new StringBuilder();
+                                sb.Append(GetHeader("Aksesuar Satış &amp; Kasa Defteri", "/", "Ana Menü"));
+                                
+                                sb.Append("<div class='form-box' style='margin-bottom:24px;'>");
+                                sb.Append("<form action='/kasa_ekle' method='POST'>");
+                                sb.Append("<div class='form-field'><label>Ürün / İşlem Açıklaması</label><input type='text' name='k_aciklama' class='form-input' placeholder='Örn: Kılıf Satışı, Kırılmaz Cam, Çay Masrafı' required autocomplete='off'></div>");
+                                sb.Append("<div class='form-field'><label>İşlem Tipi</label><select name='k_tip' class='form-input'><option value='GELİR'>➕ Gelir (Aksesuar Satışı / Nakit Giriş)</option><option value='GİDER'>➖ Gider (Dükkan Masrafı / Ödeme)</option></select></div>");
+                                sb.Append("<div class='form-field'><label>Tutar (TL)</label><input type='text' name='k_tutar' class='form-input' placeholder='Örn: 150' required autocomplete='off'></div>");
+                                sb.Append("<button type='submit' class='action-btn btn-submit' style='background:var(--accent);'>Kasaya İşle</button>");
+                                sb.Append("</form></div>");
+
+                                double toplamGelir = 0;
+                                double toplamGider = 0;
+                                var listeSb = new StringBuilder();
+
+                                try
+                                {
+                                    using (var connection = new SqliteConnection(connStr))
+                                    {
+                                        connection.Open();
+                                        using (var cmd = new SqliteCommand("SELECT * FROM kasa ORDER BY id DESC;", connection))
+                                        using (var r = cmd.ExecuteReader())
+                                        {
+                                            while (r.Read())
+                                            {
+                                                string id = r["id"].ToString() ?? "";
+                                                string aciklama = r["aciklama"].ToString() ?? "";
+                                                string tip = r["tip"].ToString() ?? "GELİR";
+                                                string tutarStr = r["tutar"].ToString() ?? "0";
+                                                double.TryParse(tutarStr, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double tutar);
+                                                string tarih = r["tarih"].ToString() ?? "";
+
+                                                if (tip == "GELİR") toplamGelir += tutar;
+                                                else toplamGider += tutar;
+
+                                                string renk = tip == "GELİR" ? "var(--green)" : "var(--red)";
+                                                string isaret = tip == "GELİR" ? "+" : "-";
+
+                                                listeSb.Append("<div class='shop-row' style='padding:18px; margin-bottom:12px;'>");
+                                                listeSb.Append("<div class='row-header' style='margin-bottom:0; align-items:center;'>");
+                                                listeSb.AppendFormat("<div><strong style='color:{0}; font-size:13px;'>[{1}]</strong> <span style='font-weight:600; margin-left:5px;'>{2}</span><br><span style='font-size:11px; color:var(--muted);'>{3}</span></div>", renk, tip, System.Web.HttpUtility.HtmlEncode(aciklama), tarih);
+                                                listeSb.AppendFormat("<div style='font-family:\"JetBrains Mono\",monospace; font-size:16px; font-weight:700; color:{0};'>{1}{2} TL</div>", renk, isaret, tutar);
+                                                listeSb.Append("</div>");
+                                                listeSb.Append("<div style='display:flex; justify-content:flex-end; margin-top:8px; border-top:1px solid var(--border); padding-top:8px;'>");
+                                                listeSb.Append("<form action='/kasa_sil' method='POST' style='margin:0;' onsubmit=\"return confirm('Bu işlemi iptal etmek (silmek) istediğinize emin misiniz?');\">");
+                                                listeSb.AppendFormat("<input type='hidden' name='id' value='{0}'>", id);
+                                                listeSb.Append("<button type='submit' class='action-btn btn-danger' style='padding:4px 12px; font-size:11px; border-radius:6px;'>Kayıt İptal</button>");
+                                                listeSb.Append("</form></div>");
+                                                listeSb.Append("</div>");
+                                            }
+                                        }
+                                    }
+                                }
+                                catch (Exception ex) { sb.AppendFormat("<div class='alert alert-err'>Hata: {0}</div>", ex.Message); }
+
+                                double netKasa = toplamGelir - toplamGider;
+                                string netRenk = netKasa >= 0 ? "var(--green)" : "var(--red)";
+
+                                sb.Append("<div style='display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:25px;'>");
+                                sb.AppendFormat("<div style='background:var(--surface); border:1px solid var(--border); padding:14px; border-radius:12px; text-align:center;'><span style='font-size:11px; color:var(--muted); font-weight:700;'>TOPLAM GELİR</span><br><strong style='color:var(--green); font-family:\"JetBrains Mono\",monospace; font-size:15px;'>+{0} TL</strong></div>", toplamGelir);
+                                sb.AppendFormat("<div style='background:var(--surface); border:1px solid var(--border); padding:14px; border-radius:12px; text-align:center;'><span style='font-size:11px; color:var(--muted); font-weight:700;'>TOPLAM GİDER</span><br><strong style='color:var(--red); font-family:\"JetBrains Mono\",monospace; font-size:15px;'>-{0} TL</strong></div>", toplamGider);
+                                sb.AppendFormat("<div style='background:var(--surface); border:1px solid var(--border); padding:14px; border-radius:12px; text-align:center;'><span style='font-size:11px; color:var(--muted); font-weight:700;'>NET KASA durumu</span><br><strong style='color:{1}; font-family:\"JetBrains Mono\",monospace; font-size:15px;'>{0} TL</strong></div>", netKasa, netRenk);
+                                sb.Append("</div>");
+
+                                if (listeSb.Length == 0)
+                                    sb.Append("<div class='empty-state'>Kasa defterinde henüz kayıtlı işlem bulunmuyor.</div>");
+                                else
+                                    sb.Append(listeSb.ToString());
+
+                                sb.Append(Footer);
+                                html = sb.ToString();
+                            }
+                            else if (rawUrl == "/kasa_ekle" && method == "POST")
+                            {
+                                string body = new StreamReader(request.InputStream, request.ContentEncoding).ReadToEnd();
+                                var nv = HttpUtility.ParseQueryString(body);
+                                string aciklama = nv["k_aciklama"] ?? "Aksesuar Satışı";
+                                string tip = nv["k_tip"] ?? "GELİR";
+                                string tutarStr = nv["k_tutar"] ?? "0";
+                                double.TryParse(tutarStr.Replace(",", "."), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double tutar);
+
+                                try
+                                {
+                                    using (var connection = new SqliteConnection(connStr))
+                                    {
+                                        connection.Open();
+                                        using (var cmd = new SqliteCommand("INSERT INTO kasa (aciklama, tip, tutar, tarih) VALUES (@aciklama, @tip, @tutar, @tarih);", connection))
+                                        {
+                                            cmd.Parameters.AddWithValue("@aciklama", aciklama);
+                                            cmd.Parameters.AddWithValue("@tip", tip);
+                                            cmd.Parameters.AddWithValue("@tutar", tutar);
+                                            cmd.Parameters.AddWithValue("@tarih", DateTime.Now.ToString("dd.MM.yyyy HH:mm"));
+                                            cmd.ExecuteNonQuery();
+                                        }
+                                    }
+                                    response.StatusCode = 302;
+                                    response.Headers.Add("Location", "/kasa_defteri");
+                                    response.OutputStream.Close();
+                                    return;
+                                }
+                                catch (Exception ex)
+                                {
+                                    html = GetHeader("Hata", "/kasa_defteri", "Geri") + $"<div class='alert alert-err'>{ex.Message}</div>" + Footer;
+                                }
+                            }
+                            else if (rawUrl == "/kasa_sil" && method == "POST")
+                            {
+                                string body = new StreamReader(request.InputStream).ReadToEnd();
+                                var nv = HttpUtility.ParseQueryString(body);
+                                string id = nv["id"];
+
+                                try
+                                {
+                                    using (var connection = new SqliteConnection(connStr))
+                                    {
+                                        connection.Open();
+                                        using (var cmd = new SqliteCommand("DELETE FROM kasa WHERE id = @id;", connection))
+                                        {
+                                            cmd.Parameters.AddWithValue("@id", id);
+                                            cmd.ExecuteNonQuery();
+                                        }
+                                    }
+                                }
+                                catch { }
+
+                                response.StatusCode = 302;
+                                response.Headers.Add("Location", "/kasa_defteri");
+                                response.OutputStream.Close();
+                                return;
+                            }
+                            // ──────────────────────────────────────────────────────────────────────────────────
+                            
                             else if (rawUrl == "/tamir_panel")
                             {
                                 html = GetHeader("Yeni Tamir Kabulü", "/", "Ana Menü") +
@@ -1318,6 +1451,12 @@ namespace CalkanGsmWeb
                         using (var altCmd = new SqliteCommand("ALTER TABLE vitrin ADD COLUMN teslim_tarihi TEXT;", connection))
                             altCmd.ExecuteNonQuery();
                     } catch { }
+
+                    // KASA DEFTERİ İÇİN YENİ SQLITE TABLOSU
+                    using (var commandKasa = new SqliteCommand("CREATE TABLE IF NOT EXISTS kasa (id INTEGER PRIMARY KEY AUTOINCREMENT, aciklama TEXT, tip TEXT, tutar REAL, tarih TEXT);", connection))
+                    {
+                        commandKasa.ExecuteNonQuery();
+                    }
                 }
             }
             catch (Exception ex) { Console.WriteLine("❌ Veritabanı Tablo Hatası: " + ex.Message); }
