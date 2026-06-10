@@ -1,19 +1,25 @@
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+# Build asamasinda .NET 8 SDK kullaniyoruz
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build-env
 WORKDIR /app
 
-# Proje dosyalarını kopyala ve restore et
+# Proje dosyalarini kopyala ve restore et
 COPY *.csproj ./
 RUN dotnet restore
 
-# Diğer her şeyi kopyala ve derle
+# Tum dosyalari kopyala ve derle
 COPY . ./
 RUN dotnet publish -c Release -o out
 
-# Çalıştırma aşaması
-FROM mcr.microsoft.com/dotnet/runtime:8.0
+# Calisma asamasinda sadece ASP.NET Runtime yeterli (Linux tabanli)
+FROM mcr.microsoft.com/dotnet/aspnet:8.0
 WORKDIR /app
-COPY --from=build /app/out .
+COPY --from=build-env /app/out .
 
-# --- DLL İSMİ PROBLEMİNİ ÇÖZEN AKILLI BAŞLATICI ---
-# Klasördeki ana .runtimeconfig.json dosyasından projenin adını otomatik bulup çalıştırır.
-ENTRYPOINT ["sh", "-c", "dll_name=$(ls *.runtimeconfig.json | sed 's/\\.runtimeconfig\\.json//'); exec dotnet \"$dll_name.dll\""]
+# Veritabani icin data klasoru
+RUN mkdir -p data
+
+# Railway'in verdigi PORT ortam degiskenini kullanacak
+ENV PORT=8080
+EXPOSE 8080
+
+ENTRYPOINT ["dotnet", "CalkanGsmWeb.dll"]
