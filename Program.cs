@@ -1,5 +1,4 @@
 using System.Runtime.InteropServices;
-#nullable disable
 using System;
 using System.IO;
 using System.Text;
@@ -7,8 +6,6 @@ using System.Net;
 using System.Web;
 using Microsoft.Data.Sqlite;
 using System.Threading;
-using System.Windows.Forms;
-using Microsoft.Web.WebView2.WinForms;
 
 namespace CalkanGsmWeb
 {
@@ -29,7 +26,7 @@ namespace CalkanGsmWeb
         private const int MAX_BODY_BYTES = 10240;
 
         // config.txt veya Railway env'den okunan port (varsayılan 8080)
-        private static string configPort = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "2626" : "8080";
+        private static string configPort = "8080";
 
         private static void ConfigYukle()
         {
@@ -69,8 +66,8 @@ namespace CalkanGsmWeb
                     "# Calkan GSM - Kullanici ve Port Ayarlari\n" +
                     "# Kullanici eklemek icin KULLANICI1, KULLANICI2 ... seklinde devam ettirin\n" +
                     "# Format: KULLANICIn=kullanici_adi:sifre\n\n" +
-                    "KULLANICI1=admin:DEGIS_BURAYI\n" +
-                    "KULLANICI2=admin:DEGIS_BURAYI_2\n" +
+                    "KULLANICI1=ENV_UZERINDEN_OKUNUR\n" +
+                    "KULLANICI2=ENV_UZERINDEN_OKUNUR\n" +
                     "PORT=2626\n");
                 Console.WriteLine("📄 config.txt bulunamadı, varsayılan dosya oluşturuldu.");
             }
@@ -167,17 +164,6 @@ namespace CalkanGsmWeb
   .stat-val { font-size: 24px; font-weight: 800; color: var(--text); }
   .stat-lbl { font-size: 12px; color: var(--muted); text-transform: uppercase; margin-top: 5px; font-weight: 600; }
   .stat-kar .stat-val { color: var(--green); }
-
-  
-  .defter-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
-  .defter-card { background: var(--surface); border: 1px solid var(--border); padding: 20px; border-radius: 12px; }
-  .input-pair { display: flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: #000; }
-  .input-pair input { background: transparent; border: none; color: white; padding: 10px; width: 50%; border-right: 1px solid var(--border); outline: none; }
-  .input-pair input:last-child { border-right: none; }
-  .input-triple { display: flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: #000; }
-  .input-triple input { background: transparent; border: none; color: white; padding: 10px; width: 33.33%; border-right: 1px solid var(--border); outline: none; }
-  .input-triple input:last-child { border-right: none; }
-  .btn-kasa { background: var(--primary); color: white; border: none; padding: 10px; border-radius: 8px; width: 100%; margin-top: 10px; font-weight: 700; cursor: pointer; }
 
   /* Tarayici varsayilan sifre goster ikonunu gizle */
   input::-ms-reveal,
@@ -563,7 +549,7 @@ namespace CalkanGsmWeb
         private static string GetHeader(string pageTitle = "", string pageBack = "", string backLabel = "Geri") =>
             "<!DOCTYPE html><html data-theme='dark'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'><title>Calkan GSM Mağaza</title>" +
             GetCSS() +
-            "</head><body><div class='wrap'>" +
+            "</head><body class='modern-ui'><div class='wrap'>" +
             "<div class='shop-nav'>" +
             "  <div class='shop-title'><div class='shop-badge'></div><div class='shop-name'>ÇALKAN GSM</div></div>" +
             "  <div class='nav-right'>" +
@@ -655,12 +641,7 @@ namespace CalkanGsmWeb
         {
             HttpListener listener = new HttpListener();
             string prefix = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? $"http://*:{port}/" : $"http://*:{port}/";
-            
-            string port = Environment.GetEnvironmentVariable("PORT") ?? "2626";
-            string url = $"http://*:{port}/";
-            listener.Prefixes.Add(url);
-            Console.WriteLine($"🚀 Sunucu aktif: {url}");
-
+            listener.Prefixes.Add(prefix);
 
             try
             {
@@ -727,7 +708,7 @@ namespace CalkanGsmWeb
                             {
                                 if (IsLocked(ip))
                                 {
-                                    html = "<!DOCTYPE html><html data-theme='dark'><head><meta charset='utf-8'>" + GetCSS() + "</head><body>" +
+                                    html = "<!DOCTYPE html><html data-theme='dark'><head><meta charset='utf-8'>" + GetCSS() + "</head><body class='modern-ui'>" +
                                            "<div class='wrap'><div class='login-wrapper'><div class='login-card'>" +
                                            "<div class='login-head'>⛔ Erişim Engellendi</div>" +
                                            "<div class='alert alert-err'>Çok fazla hatalı deneme nedeniyle bu bilgisayar 15 dakika kilitlendi.</div>" +
@@ -746,7 +727,7 @@ namespace CalkanGsmWeb
 
                                         string expiresAttr = "";
                                         if (nv["hatirla"] == "on")
-                                            expiresAttr = "; Expires=" + DateTime.Now.AddDays(30).ToString("R");
+                                            expiresAttr = "; Expires=" + DateTime.Now.AddDays(60).ToString("R");
 
                                         response.Headers.Add("Set-Cookie", "calkan_session=" + SessionValue + "; Path=/" + expiresAttr + "; SameSite=Strict");
                                         response.Headers.Add("Set-Cookie", "calkan_user=" + reqUser + "; Path=/" + expiresAttr + "; SameSite=Strict");
@@ -758,7 +739,7 @@ namespace CalkanGsmWeb
                                     else
                                     {
                                         RecordFail(ip);
-                                        html = "<!DOCTYPE html><html data-theme='dark'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>" + GetCSS() + "</head><body>" +
+                                        html = "<!DOCTYPE html><html data-theme='dark'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>" + GetCSS() + "</head><body class='modern-ui'>" +
                                                "<div class='wrap'><div class='login-wrapper'><div class='login-card'>" +
                                                "<div class='login-head'>Hatalı Giriş</div>" +
                                                "<div class='alert alert-err'>Kullanıcı adı veya şifre yanlış.</div>" +
@@ -779,7 +760,7 @@ namespace CalkanGsmWeb
                             else if (!oturumAcikMi)
                             {
                                 // Login formu — şifre göster/gizle butonu dahil
-                                html = "<!DOCTYPE html><html data-theme='dark'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>" + GetCSS() + "</head><body>" +
+                                html = "<!DOCTYPE html><html data-theme='dark'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>" + GetCSS() + "</head><body class='modern-ui'>" +
                                        "<div class='wrap'><div class='login-wrapper'><div class='login-card'>" +
                                        "<div class='login-head'>Mağaza Oturumu</div>" +
                                        "<form action='/login' method='POST' autocomplete='off'>" +
@@ -791,7 +772,7 @@ namespace CalkanGsmWeb
                                        EyeIconHTML +
                                        "</button>" +
                                        "</div></div>" +
-                                       "<label class='remember-me'><input type='checkbox' name='hatirla'> Oturumu Açık Tut (30 Gün)</label>" +
+                                       "<label class='remember-me'><input type='checkbox' name='hatirla'> Oturumu Açık Tut (60 Gün)</label>" +
                                        "<button type='submit' class='action-btn btn-submit'>Sistemi Aç</button>" +
                                        "</form></div></div></div></body></html>";
                             }
@@ -837,8 +818,6 @@ namespace CalkanGsmWeb
                                     using (var connection = new SqliteConnection(connStr))
                                     {
                                         connection.Open();
-                    
-                    
                                         string query = "INSERT INTO vitrin (marka, model, imei, alinma_tarihi, fiyat, satis_fiyati, durum, kutu_fatura, garanti) VALUES (@marka, @model, @imei, @alinma, @fiyat, @satis, @durum, @kutu, @garanti);";
                                         using (var command = new SqliteCommand(query, connection))
                                         {
@@ -877,8 +856,6 @@ namespace CalkanGsmWeb
                                     using (var connection = new SqliteConnection(connStr))
                                     {
                                         connection.Open();
-                    
-                    
                                         using (var cmd = new SqliteCommand("SELECT * FROM vitrin WHERE durum='TAMIR' ORDER BY id DESC;", connection))
                                         using (var r = cmd.ExecuteReader())
                                         {
@@ -981,8 +958,6 @@ namespace CalkanGsmWeb
                                     using (var connection = new SqliteConnection(connStr))
                                     {
                                         connection.Open();
-                    
-                    
                                         string birlesikOzellikler = string.Format("{0} | {1} | Pil: {2}", nv["v_gb"], nv["v_renk"], nv["v_pil"]);
                                         string query = "INSERT INTO vitrin (marka, model, imei, alinma_tarihi, fiyat, satis_fiyati, durum, kutu_fatura, garanti) VALUES (@marka, @model, @imei, @alinma, @fiyat, @satis, @durum, @kutu, @garanti);";
                                         using (var command = new SqliteCommand(query, connection))
@@ -1011,184 +986,6 @@ namespace CalkanGsmWeb
                                            Footer;
                                 }
                             }
-                            
-                            else if (rawUrl == "/kasa_defteri")
-                            {
-                                StringBuilder rows = new StringBuilder();
-                                double toplamGelir = 0; double toplamGider = 0;
-                                try {
-                                    using (var conn = new SqliteConnection(connStr)) {
-                                        conn.Open();
-                                        using (var cmd = new SqliteCommand("SELECT * FROM kasa_defteri ORDER BY id DESC LIMIT 30", conn)) {
-                                            using (var r = cmd.ExecuteReader()) {
-                                                while (r.Read()) {
-                                                    string t = r["tur"].ToString();
-                                                    double tutar = 0; double.TryParse(r["tutar"].ToString(), out tutar);
-                                                    double maliyet = 0; double.TryParse(r["maliyet"].ToString(), out maliyet);
-                                                    if (t == "GIDER") toplamGider += tutar; else toplamGelir += (tutar - maliyet);
-                                                    rows.Append($"<tr class='shop-row'><td>{r["tarih"]}</td><td><b>{t}</b></td><td>{r["aciklama"]}</td><td>{maliyet} ₺</td><td>{tutar} ₺</td></tr>");
-                                                }
-                                            }
-                                        }
-                                    }
-                                } catch {}
-
-                                html = GetHeader("Kasa Defteri", "/", "Ana Menu") + 
-                                    "<div class='defter-row'>" +
-                                    "  <div class='defter-card'><label>GÜN BAŞI DEVİR</label><form action='/kasa_kaydet' method='POST'><div class='input-pair'><input type='text' name='aciklama' value='Devir' readonly><input type='number' name='tutar' placeholder='Tutar' required></div><input type='hidden' name='tur' value='DEVIR'><button class='btn-kasa'>KAYDET</button></form></div>" +
-                                    "  <div class='defter-card'><label>AKSESUAR / GİDER</label><form action='/kasa_kaydet' method='POST'><div class='input-pair'><input type='text' name='aciklama' placeholder='Ürün/Not' required><input type='number' name='tutar' placeholder='Tutar' required></div><select name='tur' class='form-input' style='margin-top:10px;'><option value='AKSESUAR'>Aksesuar Satış</option><option value='GIDER'>Ödeme Çıkış</option></select><button class='btn-kasa'>KAYDET</button></form></div>" +
-                                    "</div>" +
-                                    "<div class='defter-card' style='margin-bottom:20px;'><label>TAMİR GİRİŞİ (ÜÇLÜ KUTU)</label><form action='/kasa_kaydet' method='POST'><div class='input-triple'><input type='text' name='aciklama' placeholder='Yapılan İşlem' required><input type='number' name='maliyet' placeholder='Maliyet' required><input type='number' name='tutar' placeholder='Satış Fiyatı' required></div><input type='hidden' name='tur' value='TAMIR'><button class='btn-kasa'>TAMİRİ KAYDET</button></form></div>" +
-                                    "<div class='stats-grid' style='grid-template-columns:1fr 1fr; gap:15px; margin-bottom:20px;'>" +
-                                    $"<div class='stat-card'><div class='stat-val' style='color:var(--green)'>{toplamGelir} ₺</div><div class='stat-lbl'>NET KÂR</div></div>" +
-                                    $"<div class='stat-card'><div class='stat-val' style='color:var(--primary)'>{toplamGelir - toplamGider} ₺</div><div class='stat-lbl'>KASADAKİ NET</div></div>" +
-                                    "</div>" +
-                                    "<table style='width:100%; color:white;'><thead><tr style='text-align:left; color:var(--muted);'><th>Tarih</th><th>Tür</th><th>Açıklama</th><th>Maliyet</th><th>Tutar</th></tr></thead><tbody>" + rows.ToString() + "</tbody></table>" + Footer;
-                            }
-                            else if (rawUrl == "/kasa_kaydet" && method == "POST") {
-                                var body = new StreamReader(request.InputStream).ReadToEnd();
-                                var nv = HttpUtility.ParseQueryString(body);
-                                KasaKaydet(nv["tur"], nv["aciklama"], nv["maliyet"] ?? "0", nv["tutar"]);
-                                response.StatusCode = 302; response.Headers.Add("Location", "/kasa_defteri");
-                                response.OutputStream.Close(); return;
-                            }
-
-                            
-                            else if (rawUrl == "/kasa_defteri")
-                            {
-                                StringBuilder rows = new StringBuilder();
-                                double toplamGelir = 0; double toplamGider = 0;
-                                try {
-                                    using (var conn = new SqliteConnection(connStr)) {
-                                        conn.Open();
-                                        using (var cmd = new SqliteCommand("SELECT * FROM kasa_defteri ORDER BY id DESC LIMIT 50", conn)) {
-                                            using (var r = cmd.ExecuteReader()) {
-                                                while (r.Read()) {
-                                                    string t = r["tur"].ToString();
-                                                    double tutar = 0; double.TryParse(r["tutar"].ToString(), out tutar);
-                                                    double maliyet = 0; double.TryParse(r["maliyet"].ToString(), out maliyet);
-                                                    if (t == "GIDER") toplamGider += tutar; else toplamGelir += (tutar - maliyet);
-                                                    rows.Append($"<tr class='shop-row'><td>{r["tarih"]}</td><td><b>{t}</b></td><td>{r["aciklama"]}</td><td>{maliyet} ₺</td><td>{tutar} ₺</td></tr>");
-                                                }
-                                            }
-                                        }
-                                    }
-                                } catch {}
-
-                                html = GetHeader("Kasa Defteri", "/", "Ana Menu") + 
-                                    "<div class='form-box' style='margin-bottom:20px;'>" +
-                                    "  <div class='defter-row'>" +
-                                    "    <div class='defter-card'><label>GÜN BAŞI DEVİR</label><form action='/kasa_kaydet' method='POST'><div class='input-pair'><input type='text' name='aciklama' value='Devir' readonly><input type='number' name='tutar' placeholder='Tutar' required></div><input type='hidden' name='tur' value='DEVIR'><button class='btn-kasa'>DEVİR KAYDET</button></form></div>" +
-                                    "    <div class='defter-card'><label>AKSESUAR / GİDER</label><form action='/kasa_kaydet' method='POST'><div class='input-pair'><input type='text' name='aciklama' placeholder='Ürün/Not' required><input type='number' name='tutar' placeholder='Tutar' required></div><select name='tur' class='form-input' style='margin-top:10px;'><option value='AKSESUAR'>Aksesuar Satış</option><option value='GIDER'>Ödeme Çıkış</option></select><button class='btn-kasa'>KAYDET</button></form></div>" +
-                                    "  </div>" +
-                                    "  <div class='defter-card' style='margin-top:20px;'><label>TAMİR GİRİŞİ (ÜÇLÜ KUTU)</label><form action='/kasa_kaydet' method='POST'><div class='input-triple'><input type='text' name='aciklama' placeholder='Yapılan İşlem' required><input type='number' name='maliyet' placeholder='Maliyet' required><input type='number' name='tutar' placeholder='Satış Fiyatı' required></div><input type='hidden' name='tur' value='TAMIR'><button class='btn-kasa'>TAMİRİ KAYDET</button></form></div>" +
-                                    "</div>" +
-                                    "<div class='stats-grid' style='grid-template-columns:1fr 1fr; gap:15px; margin-bottom:20px;'>" +
-                                    $"<div class='stat-card'><div class='stat-val' style='color:var(--green)'>{toplamGelir} ₺</div><div class='stat-lbl'>NET KÂR</div></div>" +
-                                    $"<div class='stat-card'><div class='stat-val' style='color:var(--accent)'>{toplamGelir - toplamGider} ₺</div><div class='stat-lbl'>KASADAKİ NET</div></div>" +
-                                    "</div>" +
-                                    "<table style='width:100%; color:white; border-collapse:collapse;'><thead><tr style='text-align:left; color:var(--muted);'><th>Tarih</th><th>Tür</th><th>Açıklama</th><th>Maliyet</th><th>Tutar</th></tr></thead><tbody>" + rows.ToString() + "</tbody></table>" + Footer;
-                            }
-                            else if (rawUrl == "/kasa_kaydet" && method == "POST") {
-                                var bodyReader = new StreamReader(request.InputStream).ReadToEnd();
-                                var nv = HttpUtility.ParseQueryString(bodyReader);
-                                KasaKaydet(nv["tur"], nv["aciklama"], nv["maliyet"] ?? "0", nv["tutar"]);
-                                response.StatusCode = 302; response.Headers.Add("Location", "/kasa_defteri");
-                                response.OutputStream.Close(); return;
-                            }
-
-                            
-                            else if (rawUrl == "/kasa_defteri")
-                            {
-                                StringBuilder rows = new StringBuilder();
-                                double toplamGelir = 0; double toplamGider = 0;
-                                try {
-                                    using (var conn = new SqliteConnection(connStr)) {
-                                        conn.Open();
-                                        using (var cmd = new SqliteCommand("SELECT * FROM kasa_defteri ORDER BY id DESC LIMIT 100", conn)) {
-                                            using (var r = cmd.ExecuteReader()) {
-                                                while (r.Read()) {
-                                                    string t = r["tur"].ToString();
-                                                    double tutar = 0; double.TryParse(r["tutar"].ToString(), out tutar);
-                                                    double maliyet = 0; double.TryParse(r["maliyet"].ToString(), out maliyet);
-                                                    if (t == "GIDER") toplamGider += tutar; 
-                                                    else if (t == "DEVIR") { /* Devir kâr degildir */ }
-                                                    else toplamGelir += (tutar - maliyet);
-                                                    rows.Append($"<tr class='shop-row'><td>{r["tarih"]}</td><td><b>{t}</b></td><td>{r["aciklama"]}</td><td>{maliyet} ₺</td><td>{tutar} ₺</td></tr>");
-                                                }
-                                            }
-                                        }
-                                    }
-                                } catch {}
-
-                                html = GetHeader("Kasa Defteri", "/", "Ana Menü") + 
-                                    "<div class='form-box' style='margin-bottom:20px;'>" +
-                                    "  <div class='defter-row'>" +
-                                    "    <div class='defter-card'><label>GÜN BAŞI DEVİR</label><form action='/kasa_kaydet' method='POST'><div class='input-pair'><input type='text' name='aciklama' value='Devir' readonly><input type='number' name='tutar' placeholder='Tutar' required></div><input type='hidden' name='tur' value='DEVIR'><button class='btn-kasa'>DEVİR KAYDET</button></form></div>" +
-                                    "    <div class='defter-card'><label>AKSESUAR / GİDER</label><form action='/kasa_kaydet' method='POST'><div class='input-pair'><input type='text' name='aciklama' placeholder='Ürün/Not' required><input type='number' name='tutar' placeholder='Tutar' required></div><select name='tur' class='form-input' style='margin-top:10px;'><option value='AKSESUAR'>Aksesuar Satış</option><option value='GIDER'>Ödeme Çıkış</option></select><button class='btn-kasa'>KAYDET</button></form></div>" +
-                                    "  </div>" +
-                                    "  <div class='defter-card' style='margin-top:20px;'><label>TAMİR GİRİŞİ (ÜÇLÜ KUTU)</label><form action='/kasa_kaydet' method='POST'><div class='input-triple'><input type='text' name='aciklama' placeholder='Yapılan İşlem' required><input type='number' name='maliyet' placeholder='Maliyet' required><input type='number' name='tutar' placeholder='Satış Fiyatı' required></div><input type='hidden' name='tur' value='TAMIR'><button class='btn-kasa'>TAMİRİ KAYDET</button></form></div>" +
-                                    "</div>" +
-                                    "<div class='stats-grid' style='grid-template-columns:1fr 1fr; gap:15px; margin-bottom:20px;'>" +
-                                    $"<div class='stat-card'><div class='stat-val' style='color:var(--green)'>{toplamGelir} ₺</div><div class='stat-lbl'>TOPLAM KÂR</div></div>" +
-                                    $"<div class='stat-card'><div class='stat-val' style='color:var(--accent)'>{toplamGelir - toplamGider} ₺</div><div class='stat-lbl'>KASADAKİ NET</div></div>" +
-                                    "</div>" +
-                                    "<table style='width:100%; color:white; border-collapse:collapse;'><thead><tr style='text-align:left; color:var(--muted);'><th>Tarih</th><th>Tür</th><th>Açıklama</th><th>Maliyet</th><th>Tutar</th></tr></thead><tbody>" + rows.ToString() + "</tbody></table>" + Footer;
-                            }
-                            else if (rawUrl == "/kasa_kaydet" && method == "POST") {
-                                var bodyReader = new StreamReader(request.InputStream).ReadToEnd();
-                                var nv = HttpUtility.ParseQueryString(bodyReader);
-                                KasaKaydet(nv["tur"], nv["aciklama"], nv["maliyet"] ?? "0", nv["tutar"]);
-                                response.StatusCode = 302; response.Headers.Add("Location", "/kasa_defteri");
-                                response.OutputStream.Close(); return;
-                            }
-
-                            
-                            else if (rawUrl == "/kasa_defteri")
-                            {
-                                StringBuilder rows = new StringBuilder();
-                                double toplamGelir = 0; double toplamGider = 0;
-                                try {
-                                    using (var conn = new SqliteConnection(connStr)) {
-                                        conn.Open();
-                                        using (var cmd = new SqliteCommand("SELECT * FROM kasa_defteri ORDER BY id DESC LIMIT 100", conn)) {
-                                            using (var r = cmd.ExecuteReader()) {
-                                                while (r.Read()) {
-                                                    string t = r["tur"].ToString();
-                                                    double tutar = 0; double.TryParse(r["tutar"].ToString(), out tutar);
-                                                    double maliyet = 0; double.TryParse(r["maliyet"].ToString(), out maliyet);
-                                                    if (t == "GIDER") toplamGider += tutar; 
-                                                    else if (t == "DEVIR") { /* Devir kar degil */ }
-                                                    else toplamGelir += (tutar - maliyet);
-                                                    rows.Append($"<tr class='shop-row'><td>{r["tarih"]}</td><td><b>{t}</b></td><td>{r["aciklama"]}</td><td>{maliyet} ₺</td><td>{tutar} ₺</td></tr>");
-                                                }
-                                            }
-                                        }
-                                    }
-                                } catch {}
-
-                                html = GetHeader("Kasa Defteri", "/", "Ana Menü") + 
-                                    "<div class='form-box' style='margin-bottom:20px;'>" +
-                                    "  <div class='defter-row'>" +
-                                    "    <div class='defter-card'><label>GÜN BAŞI DEVİR</label><form action='/kasa_kaydet' method='POST'><div class='input-pair'><input type='text' name='aciklama' value='Devir' readonly><input type='number' name='tutar' placeholder='Tutar' required></div><input type='hidden' name='tur' value='DEVIR'><button class='btn-kasa'>DEVİR KAYDET</button></form></div>" +
-                                    "    <div class='defter-card'><label>AKSESUAR / GİDER</label><form action='/kasa_kaydet' method='POST'><div class='input-pair'><input type='text' name='aciklama' placeholder='Ürün/Not' required><input type='number' name='tutar' placeholder='Tutar' required></div><select name='tur' class='form-input' style='margin-top:10px;'><option value='AKSESUAR'>Aksesuar Satış</option><option value='GIDER'>Ödeme Çıkış</option></select><button class='btn-kasa'>KAYDET</button></form></div>" +
-                                    "  </div>" +
-                                    "  <div class='defter-card' style='margin-top:20px;'><label>TAMİR GİRİŞİ (ÜÇLÜ KUTU)</label><form action='/kasa_kaydet' method='POST'><div class='input-triple'><input type='text' name='aciklama' placeholder='Yapılan İşlem' required><input type='number' name='maliyet' placeholder='Maliyet' required><input type='number' name='tutar' placeholder='Satış Fiyatı' required></div><input type='hidden' name='tur' value='TAMIR'><button class='btn-kasa'>TAMİRİ KAYDET</button></form></div>" +
-                                    "</div>" +
-                                    "<div class='stats-grid' style='grid-template-columns:1fr 1fr; gap:15px; margin-bottom:20px;'>" +
-                                    $"<div class='stat-card'><div class='stat-val' style='color:var(--green)'>{toplamGelir} ₺</div><div class='stat-lbl'>TOPLAM KÂR</div></div>" +
-                                    $"<div class='stat-card'><div class='stat-val' style='color:var(--accent)'>{toplamGelir - toplamGider} ₺</div><div class='stat-lbl'>KASADAKİ NET</div></div>" +
-                                    "</div>" +
-                                    "<table style='width:100%; color:white; border-collapse:collapse;'><thead><tr style='text-align:left; color:var(--muted);'><th>Tarih</th><th>Tür</th><th>Açıklama</th><th>Maliyet</th><th>Tutar</th></tr></thead><tbody>" + rows.ToString() + "</tbody></table>" + Footer;
-                            }
-                            else if (rawUrl == "/kasa_kaydet" && method == "POST") {
-                                var bodyReader = new StreamReader(request.InputStream).ReadToEnd();
-                                var nv = HttpUtility.ParseQueryString(bodyReader);
-                                KasaKaydet(nv["tur"], nv["aciklama"], nv["maliyet"] ?? "0", nv["tutar"]);
-                                response.StatusCode = 302; response.Headers.Add("Location", "/kasa_defteri");
-                                response.OutputStream.Close(); return;
-                            }
-
                             else if (rawUrl == "/vitrin_listele")
                             {
                                 var sb = new StringBuilder();
@@ -1200,8 +997,6 @@ namespace CalkanGsmWeb
                                     using (var connection = new SqliteConnection(connStr))
                                     {
                                         connection.Open();
-                    
-                    
                                         using (var cmd = new SqliteCommand("SELECT * FROM vitrin WHERE durum='VITRIN' ORDER BY id DESC;", connection))
                                         using (var r = cmd.ExecuteReader())
                                         {
@@ -1261,8 +1056,6 @@ namespace CalkanGsmWeb
                                     using (var connection = new SqliteConnection(connStr))
                                     {
                                         connection.Open();
-                    
-                    
                                         using (var cmd = new SqliteCommand("SELECT * FROM vitrin WHERE durum='TESLIM_EDILDI' ORDER BY id DESC;", connection))
                                         using (var r = cmd.ExecuteReader())
                                         {
@@ -1308,8 +1101,6 @@ namespace CalkanGsmWeb
                                     using (var connection = new SqliteConnection(connStr))
                                     {
                                         connection.Open();
-                    
-                    
                                         using (var cmd = new SqliteCommand("SELECT * FROM vitrin WHERE durum='SATILDI' ORDER BY id DESC;", connection))
                                         using (var r = cmd.ExecuteReader())
                                         {
@@ -1380,8 +1171,6 @@ namespace CalkanGsmWeb
                                     using (var connection = new SqliteConnection(connStr))
                                     {
                                         connection.Open();
-                    
-                    
                                         using (var cmd = new SqliteCommand("SELECT * FROM vitrin WHERE id=@id;", connection))
                                         {
                                             cmd.Parameters.AddWithValue("@id", editId);
@@ -1470,8 +1259,6 @@ namespace CalkanGsmWeb
                                     using (var connection = new SqliteConnection(connStr))
                                     {
                                         connection.Open();
-                    
-                    
                                         if (tip == "tamir")
                                         {
                                             using (var cmd = new SqliteCommand("UPDATE vitrin SET marka=@marka, model=@model, imei=@imei, fiyat=@fiyat, satis_fiyati=@satis, kutu_fatura=@kutu, garanti=@garanti, alinma_tarihi=@alinma WHERE id=@id;", connection))
@@ -1543,8 +1330,6 @@ namespace CalkanGsmWeb
                                     using (var connection = new SqliteConnection(connStr))
                                     {
                                         connection.Open();
-                    
-                    
 
                                         if (git == "arsiv")
                                         {
@@ -1607,8 +1392,6 @@ namespace CalkanGsmWeb
             try {
                 using (var connection = new SqliteConnection(connStr)) {
                     connection.Open();
-                    
-                    
                     using (var cmd = new SqliteCommand("SELECT fiyat, satis_fiyati, durum FROM vitrin", connection)) {
                         using (var reader = cmd.ExecuteReader()) {
                             while (reader.Read()) {
@@ -1630,45 +1413,17 @@ namespace CalkanGsmWeb
             return (t, a, s, k);
         }
 
-
-
-        
-        
-                }
-            } catch {}
-        }
-
-        
-        private static void KasaKaydet(string tur, string aciklama, string maliyet, string tutar) {
-            try {
-                using (var conn = new SqliteConnection(connStr)) {
-                    conn.Open();
-                    using (var cmd = new SqliteCommand("INSERT INTO kasa_defteri (tarih, tur, aciklama, maliyet, tutar) VALUES (@tarih, @tur, @aciklama, @maliyet, @tutar)", conn)) {
-                        cmd.Parameters.AddWithValue("@tarih", DateTime.Now.ToString("dd.MM.yyyy HH:mm"));
-                        cmd.Parameters.AddWithValue("@tur", tur);
-                        cmd.Parameters.AddWithValue("@aciklama", aciklama);
-                        cmd.Parameters.AddWithValue("@maliyet", string.IsNullOrEmpty(maliyet) ? "0" : maliyet);
-                        cmd.Parameters.AddWithValue("@tutar", string.IsNullOrEmpty(tutar) ? "0" : tutar);
-                        cmd.ExecuteNonQuery();
-                    }
-                }
-            } catch {}
-        }
-
-        private static void TabloyuHazirla() {
-            try {
-                using (var connection = new SqliteConnection(connStr)) {
+        private static void TabloyuHazirla()
+        {
+            try
+            {
+                using (var connection = new SqliteConnection(connStr))
+                {
                     connection.Open();
-                    using (var cmd = new SqliteCommand("CREATE TABLE IF NOT EXISTS kasa_defteri (id INTEGER PRIMARY KEY AUTOINCREMENT, tarih TEXT, tur TEXT, aciklama TEXT, maliyet TEXT, tutar TEXT);", connection)) { cmd.ExecuteNonQuery(); }
-                    using (var command = new SqliteCommand("CREATE TABLE IF NOT EXISTS vitrin (id INTEGER PRIMARY KEY AUTOINCREMENT, marka TEXT, model TEXT, imei TEXT, alinma_tarihi TEXT, fiyat TEXT, satis_fiyati TEXT, durum TEXT, kutu_fatura TEXT, garanti TEXT, teslim_tarihi TEXT, notlar TEXT);", connection)) { command.ExecuteNonQuery(); }
-                    try {
-                        using (var altCmd = new SqliteCommand("ALTER TABLE vitrin ADD COLUMN teslim_tarihi TEXT;", connection))
-                            altCmd.ExecuteNonQuery();
-                    } catch { }
-                }
-            } catch (Exception ex) { Console.WriteLine("❌ Veritabanı Hatası: " + ex.Message); }
-        }
-
+                    using (var command = new SqliteCommand("CREATE TABLE IF NOT EXISTS vitrin (id INTEGER PRIMARY KEY AUTOINCREMENT, marka TEXT, model TEXT, imei TEXT, alinma_tarihi TEXT, fiyat TEXT, satis_fiyati TEXT, durum TEXT, kutu_fatura TEXT, garanti TEXT, teslim_tarihi TEXT, notlar TEXT);", connection))
+                    {
+                        command.ExecuteNonQuery();
+                    }
                     // Eski DB'de kolon yoksa ekle (migration)
                     try {
                         using (var altCmd = new SqliteCommand("ALTER TABLE vitrin ADD COLUMN teslim_tarihi TEXT;", connection))
@@ -1676,6 +1431,7 @@ namespace CalkanGsmWeb
                     } catch { /* zaten varsa hata yok */ }
                 }
             }
-            catch (Exception ex) { Console.WriteLine("❌ Veritabanı Tablo Hatası: " + ex.Message);
+            catch (Exception ex) { Console.WriteLine("❌ Veritabanı Tablo Hatası: " + ex.Message); }
+        }
     }
 }
