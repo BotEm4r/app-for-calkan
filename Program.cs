@@ -5,31 +5,36 @@ using System.Net;
 using System.Web;
 using Microsoft.Data.Sqlite;
 using System.Threading;
+using System.Collections.Generic;
+using System.Collections.Concurrent;
 
 namespace CalkanGsmWeb
 {
     class Program
     {
-        private static string dbPath = Path.Combine(Directory.GetCurrentDirectory(), "data", "calkan_gsm.db");
+        // Linux ile uyumlu klasör dizini
+        private static string BaseDir = AppContext.BaseDirectory;
+        private static string dbPath = Path.Combine(BaseDir, "data", "calkan_gsm.db");
         private static string connStr => $"Data Source={dbPath};";
 
-        private static System.Collections.Generic.Dictionary<string, string> Kullanicilar = new System.Collections.Generic.Dictionary<string, string>();
-        private static string SessionValue = "calkan_oturum_" + Guid.NewGuid().ToString().Substring(0, 8);
+        private static Dictionary<string, string> Kullanicilar = new Dictionary<string, string>();
+        
+        // GÜVENLİK: Çalınmaya karşı rastgele dinamik oturum anahtarı
+        private static string SessionValue = Environment.GetEnvironmentVariable("SESSION_SECRET") ?? Guid.NewGuid().ToString("N");
 
-        private static System.Collections.Concurrent.ConcurrentDictionary<string, (int count, DateTime lockUntil)> loginAttempts = new();
-        private static System.Collections.Concurrent.ConcurrentDictionary<string, (int count, DateTime window)> rateLimit = new();
+        private static ConcurrentDictionary<string, (int count, DateTime lockUntil)> loginAttempts = new();
+        private static ConcurrentDictionary<string, (int count, DateTime window)> rateLimit = new();
         private static int activeConnections = 0;
         private const int MAX_CONNECTIONS = 100;
         private const int MAX_RPS = 25;
         private const int MAX_BODY_BYTES = 10240;
 
-        // config.txt veya Railway env'den okunan port (varsayılan 8080)
+        // İstediğin gibi varsayılan port
         private static string configPort = "8080";
 
         private static void ConfigYukle()
         {
             // ── 1. ADIM: RAILWAY ORTAM DEĞİŞKENLERİNE BAK ──────────────────────────
-            // KULLANICI1=admin:sifre, KULLANICI2=teknisyen:pass123 ... şeklinde birden fazla tanımlanabilir
             bool railwayKullaniciBulundu = false;
             for (int i = 1; i <= 20; i++)
             {
@@ -43,12 +48,10 @@ namespace CalkanGsmWeb
                 }
             }
 
-            // Railway'de PORT env değişkeni varsa onu da al
             string railwayPort = Environment.GetEnvironmentVariable("PORT");
             if (!string.IsNullOrEmpty(railwayPort))
                 configPort = railwayPort;
 
-            // Railway'de kullanıcı tanımlandıysa config.txt'ye gerek yok
             if (railwayKullaniciBulundu)
             {
                 Console.WriteLine($"✅ {Kullanicilar.Count} kullanıcı Railway ortam değişkenlerinden yüklendi.");
@@ -56,16 +59,13 @@ namespace CalkanGsmWeb
             }
 
             // ── 2. ADIM: LOCALDEKİ CONFIG.TXT'YE BAK ────────────────────────────────
-            string configPath = Path.Combine(Directory.GetCurrentDirectory(), "config.txt");
+            string configPath = Path.Combine(BaseDir, "config.txt");
             if (!File.Exists(configPath))
             {
-                // Örnek config.txt oluştur
                 File.WriteAllText(configPath,
                     "# Calkan GSM - Kullanici ve Port Ayarlari\n" +
-                    "# Kullanici eklemek icin KULLANICI1, KULLANICI2 ... seklinde devam ettirin\n" +
                     "# Format: KULLANICIn=kullanici_adi:sifre\n\n" +
-                    "KULLANICI1=calkanadmin:fcalkan2626\n" +
-                    "KULLANICI2=teknisyen:calkan1234\n" +
+                    "KULLANICI1=admin:SifreniBurayaYaz\n" +
                     "PORT=8080\n");
                 Console.WriteLine("📄 config.txt bulunamadı, varsayılan dosya oluşturuldu.");
             }
@@ -100,13 +100,11 @@ namespace CalkanGsmWeb
 
             if (Kullanicilar.Count == 0)
             {
-                // Config.txt'de hiç kullanıcı yoksa güvenli fallback
-                Kullanicilar["calkanadmin"] = "fcalkan2626";
-                Console.WriteLine("⚠️ config.txt'de kullanıcı bulunamadı, varsayılan hesap kullanılıyor.");
+                Console.WriteLine("⚠️ DİKKAT: Hiçbir kullanıcı tanımlanmadı! Panele giriş yapılamaz.");
             }
             else
             {
-                Console.WriteLine($"✅ {Kullanicilar.Count} kullanıcı config.txt'den yüklendi. Port: {configPort}");
+                Console.WriteLine($"✅ {Kullanicilar.Count} kullanıcı yüklendi. Port: {configPort}");
             }
         }
 
@@ -156,6 +154,10 @@ namespace CalkanGsmWeb
   -webkit-tap-highlight-color: transparent;
   outline: none;
 }
+  /* Tarayici varsayilan sifre goster ikonunu gizle */
+  input::-ms-reveal,
+  input::-ms-clear { display: none; }
+
   :root {
     --bg:          #0f172a;
     --surface:     #1e293b;
@@ -547,7 +549,6 @@ namespace CalkanGsmWeb
             (pageBack != "" ? $"<a href='{pageBack}' class='back-link'>← {backLabel}</a>" : "") +
             (pageTitle != "" ? $"<div class='view-heading'><div class='view-title'>{pageTitle}</div></div>" : "");
 
-        // Şifre göster/gizle butonu SVG'si (başlangıçta kapalı göz = şifre gizli)
         private static string EyeIconHTML =>
             "<svg viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'>" +
             "<path stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z'/>" +
@@ -559,23 +560,32 @@ namespace CalkanGsmWeb
         static void Main(string[] args)
         {
             ConfigYukle();
-            Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
+            
+            string? dir = Path.GetDirectoryName(dbPath);
+            if (!string.IsNullOrEmpty(dir)) 
+                Directory.CreateDirectory(dir);
+                
             TabloyuHazirla();
 
-            // PORT önceliği: Railway PORT env > config.txt PORT > varsayılan 8080
-            // ConfigYukle içinde configPort zaten ayarlandı
+            // Linux ortamı için sadece konsolda sunucuyu başlatıyoruz
+            Console.WriteLine($"🌐 Çalkan GSM Sunucusu Başlatılıyor...");
             StartServer(configPort);
+            
+            // Programın arka planda kapanmaması için sonsuz döngü
+            Thread.Sleep(Timeout.Infinite);
         }
 
         private static void StartServer(string port)
         {
             HttpListener listener = new HttpListener();
+            
+            // GÜVENLİK VE RAILWAY UYUMU: Reverse Proxy için '*' kullanmak şart.
             listener.Prefixes.Add($"http://*:{port}/");
 
             try
             {
                 listener.Start();
-                Console.WriteLine($"🚀 Web Sunucusu Başarıyla Başlatıldı! Port: {port}");
+                Console.WriteLine($"🚀 Arka Plan Sunucusu Aktif! Port: {port}");
                 Console.WriteLine($"👥 Aktif kullanıcı sayısı: {Kullanicilar.Count}");
 
                 while (true)
@@ -688,7 +698,6 @@ namespace CalkanGsmWeb
                             }
                             else if (!oturumAcikMi)
                             {
-                                // Login formu — şifre göster/gizle butonu dahil
                                 html = "<!DOCTYPE html><html data-theme='dark'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>" + GetCSS() + "</head><body>" +
                                        "<div class='wrap'><div class='login-wrapper'><div class='login-card'>" +
                                        "<div class='login-head'>Mağaza Oturumu</div>" +
@@ -725,6 +734,7 @@ namespace CalkanGsmWeb
                                 html = GetHeader("Yeni Tamir Kabulü", "/", "Ana Menü") +
                                        "<div class='form-box'>" +
                                        "<form action='/ekle' method='POST'>" +
+                                       "<input type='hidden' name='tip' value='tamir'>" +
                                        "<div class='form-field'><label>Müşteri Adı Soyadı</label><input type='text' name='musteri' class='form-input' placeholder='Müşteri İsim Soyisim' required autocomplete='off'></div>" +
                                        "<div class='form-field'><label>Müşteri Telefon No</label><input type='text' name='telefon' class='form-input' placeholder='05xx xxx xx xx' required autocomplete='off'></div>" +
                                        "<div class='form-field'><label>Cihaz Markası</label><input type='text' name='c_marka' class='form-input' placeholder='Örn: Samsung, Apple' required autocomplete='off'></div>" +
@@ -738,10 +748,32 @@ namespace CalkanGsmWeb
                                        "</div>" +
                                        Footer;
                             }
+                            else if (rawUrl == "/vitrin_panel")
+                            {
+                                html = GetHeader("Vitrin Envanter Girişi", "/", "Ana Menü") +
+                                       "<div class='form-box'>" +
+                                       "<form action='/ekle' method='POST'>" +
+                                       "<input type='hidden' name='tip' value='vitrin'>" +
+                                       "<div class='form-field'><label>Cihaz Markası &amp; Modeli</label><input type='text' name='v_model' class='form-input' placeholder='Örn: iPhone 13 Pro' required autocomplete='off'></div>" +
+                                       "<div class='form-field'><label>Kapasite (GB)</label><input type='text' name='v_gb' class='form-input' placeholder='Örn: 128 GB' required autocomplete='off'></div>" +
+                                       "<div class='form-field'><label>Kasa Rengi</label><input type='text' name='v_renk' class='form-input' placeholder='Örn: Grafiti' required autocomplete='off'></div>" +
+                                       "<div class='form-field'><label>Pil Yüzdesi</label><input type='text' name='v_pil' class='form-input' placeholder='Örn: %85' required autocomplete='off'></div>" +
+                                       "<div class='form-field'><label>Garanti Durumu</label><input type='text' name='v_garanti' class='form-input' placeholder='Örn: 6 Ay Dükkan veya Yok' required autocomplete='off'></div>" +
+                                       "<div class='form-field'><label>IMEI Numarası</label><input type='text' name='v_imei' class='form-input' placeholder='Opsiyonel' autocomplete='off'></div>" +
+                                       "<div class='form-field'><label>Dükkan Alış Fiyatı / Maliyet (TL)</label><input type='text' name='v_alis' class='form-input' placeholder='Maliyet (Sadece size görünür)' autocomplete='off'></div>" +
+                                       "<div class='form-field'><label>Vitrin Satış Fiyatı (TL)</label><input type='text' name='v_satis' class='form-input' placeholder='Etiket fiyatı' required autocomplete='off'></div>" +
+                                       "<div class='form-field'><label>Kutu / Fatura / Aksesuar Detayı</label><input type='text' name='v_kutu' class='form-input' placeholder='Kutu var, orijinal şarj aleti vs.' autocomplete='off'></div>" +
+                                       "<button type='submit' class='action-btn btn-submit'>Cihazı Vitrine Koy (Stoğa Ekle)</button>" +
+                                       "</form>" +
+                                       "</div>" +
+                                       Footer;
+                            }
                             else if (rawUrl == "/ekle" && method == "POST")
                             {
                                 string body = new StreamReader(request.InputStream, request.ContentEncoding).ReadToEnd();
                                 var nv = HttpUtility.ParseQueryString(body);
+                                string tip = nv["tip"] ?? "tamir";
+
                                 try
                                 {
                                     using (var connection = new SqliteConnection(connStr))
@@ -750,28 +782,42 @@ namespace CalkanGsmWeb
                                         string query = "INSERT INTO vitrin (marka, model, imei, alinma_tarihi, fiyat, satis_fiyati, durum, kutu_fatura, garanti) VALUES (@marka, @model, @imei, @alinma, @fiyat, @satis, @durum, @kutu, @garanti);";
                                         using (var command = new SqliteCommand(query, connection))
                                         {
-                                            command.Parameters.AddWithValue("@marka", nv["musteri"]);
-                                            command.Parameters.AddWithValue("@model", nv["telefon"]);
-                                            command.Parameters.AddWithValue("@imei", nv["c_marka"] + " " + nv["c_model"]);
-                                            command.Parameters.AddWithValue("@alinma", DateTime.Now.ToString("dd.MM.yyyy"));
-                                            command.Parameters.AddWithValue("@fiyat", nv["islem"]);
-                                            command.Parameters.AddWithValue("@satis", nv["t_fiyat"]);
-                                            command.Parameters.AddWithValue("@durum", "TAMIR");
-                                            command.Parameters.AddWithValue("@kutu", nv["ariza"]);
-                                            command.Parameters.AddWithValue("@garanti", nv["tamir_durum"] ?? "Bekliyor");
+                                            if (tip == "tamir")
+                                            {
+                                                command.Parameters.AddWithValue("@marka", nv["musteri"] ?? "");
+                                                command.Parameters.AddWithValue("@model", nv["telefon"] ?? "");
+                                                command.Parameters.AddWithValue("@imei", (nv["c_marka"] + " " + nv["c_model"]).Trim());
+                                                command.Parameters.AddWithValue("@alinma", DateTime.Now.ToString("dd.MM.yyyy"));
+                                                command.Parameters.AddWithValue("@fiyat", nv["islem"] ?? "");
+                                                command.Parameters.AddWithValue("@satis", nv["t_fiyat"] ?? "");
+                                                command.Parameters.AddWithValue("@durum", "TAMIR");
+                                                command.Parameters.AddWithValue("@kutu", nv["ariza"] ?? "");
+                                                command.Parameters.AddWithValue("@garanti", nv["tamir_durum"] ?? "Bekliyor");
+                                            }
+                                            else
+                                            {
+                                                string birlesikOzellikler = string.Format("{0} | {1} | Pil: {2}", nv["v_gb"], nv["v_renk"], nv["v_pil"]);
+                                                command.Parameters.AddWithValue("@marka", birlesikOzellikler);
+                                                command.Parameters.AddWithValue("@model", nv["v_model"] ?? "");
+                                                command.Parameters.AddWithValue("@imei", nv["v_imei"] ?? "");
+                                                command.Parameters.AddWithValue("@alinma", DateTime.Now.ToString("dd.MM.yyyy"));
+                                                command.Parameters.AddWithValue("@fiyat", nv["v_alis"] ?? "");
+                                                command.Parameters.AddWithValue("@satis", nv["v_satis"] ?? "");
+                                                command.Parameters.AddWithValue("@durum", "VITRIN");
+                                                command.Parameters.AddWithValue("@kutu", nv["v_kutu"] ?? "");
+                                                command.Parameters.AddWithValue("@garanti", nv["v_garanti"] ?? "");
+                                            }
                                             command.ExecuteNonQuery();
                                         }
                                     }
-                                    html = GetHeader("Kayıt Başarılı", "/tamir_panel", "Yeni Form") +
-                                           "<div class='alert alert-ok'>Tamir formu dükkan veritabanına başarıyla işlendi.</div>" +
-                                           "<a href='/tamir_listele' class='action-btn btn-submit'>Aktif Tamir Kuyruğuna Git</a>" +
-                                           Footer;
+                                    response.StatusCode = 302;
+                                    response.Headers.Add("Location", tip == "tamir" ? "/tamir_listele" : "/vitrin_listele");
+                                    response.OutputStream.Close();
+                                    return;
                                 }
                                 catch (Exception ex)
                                 {
-                                    html = GetHeader("Sistem Hatası", "/tamir_panel", "Geri") +
-                                           "<div class='alert alert-err'>Veri tabanına yazılamadı: " + ex.Message + "</div>" +
-                                           Footer;
+                                    html = GetHeader("Kayıt Hatası", "/", "Ana Menü") + $"<div class='alert alert-err'>{ex.Message}</div>" + Footer;
                                 }
                             }
                             else if (rawUrl == "/tamir_listele")
@@ -801,7 +847,6 @@ namespace CalkanGsmWeb
                                                     if (cleanPhone.StartsWith("0")) cleanPhone = cleanPhone.Substring(1);
                                                     if (!cleanPhone.StartsWith("90") && cleanPhone.Length == 10) cleanPhone = "90" + cleanPhone;
 
-                                                    // Bekleme günü hesapla
                                                     string alinmaTarihi = r["alinma_tarihi"]?.ToString() ?? "";
                                                     string beklemeBadge = "";
                                                     if (DateTime.TryParseExact(alinmaTarihi, "dd.MM.yyyy", null, System.Globalization.DateTimeStyles.None, out DateTime alinmaD))
@@ -811,7 +856,6 @@ namespace CalkanGsmWeb
                                                         beklemeBadge = $"<span class='tag' style='border-color:{badgeColor};color:{badgeColor};'>⏳ {gun} gündür bekliyor</span>";
                                                     }
 
-                                                    // WA şablonları
                                                     string cihazAdi = r["imei"]?.ToString() ?? "";
                                                     string waHazir = HttpUtility.UrlEncode($"Merhaba, Çalkan GSM'den yazıyoruz. {cihazAdi} cihazınızın tamiri tamamlandı, teslim alabilirsiniz. İyi günler 🙂");
                                                     string waParca = HttpUtility.UrlEncode($"Merhaba, Çalkan GSM'den yazıyoruz. {cihazAdi} cihazınız için gerekli parça temin ediliyor, tahmini süre hakkında sizi bilgilendireceğiz.");
@@ -827,7 +871,7 @@ namespace CalkanGsmWeb
                                                     sb.AppendFormat("<span class='tag'>📅 Kabul: {0}</span>", alinmaTarihi);
                                                     sb.AppendFormat("<span class='tag'>📞 {0}</span>", rawPhone);
                                                     sb.AppendFormat("<span class='tag'>🛠️ {0}</span>", r["fiyat"]);
-                                                    // Durum badge
+                                                    
                                                     string durumVal = r["garanti"]?.ToString() ?? "Bekliyor";
                                                     string durumColor = durumVal == "Hazır" ? "#4ade80" : durumVal == "Tamirde" ? "#38bdf8" : durumVal == "Parça Bekleniyor" ? "#fb923c" : "#94a3b8";
                                                     sb.AppendFormat("<span class='tag' style='border-color:{1};color:{1};font-weight:600;'>{0}</span>", durumVal, durumColor);
@@ -858,62 +902,6 @@ namespace CalkanGsmWeb
                                 }
                                 sb.Append(Footer);
                                 html = sb.ToString();
-                            }
-                            else if (rawUrl == "/vitrin_panel")
-                            {
-                                html = GetHeader("Vitrin Envanter Girişi", "/", "Ana Menü") +
-                                       "<div class='form-box'>" +
-                                       "<form action='/ekle_vitrin' method='POST'>" +
-                                       "<div class='form-field'><label>Cihaz Markası &amp; Modeli</label><input type='text' name='v_model' class='form-input' placeholder='Örn: iPhone 13 Pro' required autocomplete='off'></div>" +
-                                       "<div class='form-field'><label>Kapasite (GB)</label><input type='text' name='v_gb' class='form-input' placeholder='Örn: 128 GB' required autocomplete='off'></div>" +
-                                       "<div class='form-field'><label>Kasa Rengi</label><input type='text' name='v_renk' class='form-input' placeholder='Örn: Grafiti' required autocomplete='off'></div>" +
-                                       "<div class='form-field'><label>Pil Yüzdesi</label><input type='text' name='v_pil' class='form-input' placeholder='Örn: %85' required autocomplete='off'></div>" +
-                                       "<div class='form-field'><label>Garanti Durumu</label><input type='text' name='v_garanti' class='form-input' placeholder='Örn: 6 Ay Dükkan veya Yok' required autocomplete='off'></div>" +
-                                       "<div class='form-field'><label>IMEI Numarası</label><input type='text' name='v_imei' class='form-input' placeholder='Opsiyonel' autocomplete='off'></div>" +
-                                       "<div class='form-field'><label>Dükkan Alış Fiyatı / Maliyet (TL)</label><input type='text' name='v_alis' class='form-input' placeholder='Maliyet (Sadece size görünür)' autocomplete='off'></div>" +
-                                       "<div class='form-field'><label>Vitrin Satış Fiyatı (TL)</label><input type='text' name='v_satis' class='form-input' placeholder='Etiket fiyatı' required autocomplete='off'></div>" +
-                                       "<div class='form-field'><label>Kutu / Fatura / Aksesuar Detayı</label><input type='text' name='v_kutu' class='form-input' placeholder='Kutu var, orijinal şarj aleti vs.' autocomplete='off'></div>" +
-                                       "<button type='submit' class='action-btn btn-submit'>Cihazı Vitrine Koy (Stoğa Ekle)</button>" +
-                                       "</form>" +
-                                       "</div>" +
-                                       Footer;
-                            }
-                            else if (rawUrl == "/ekle_vitrin" && method == "POST")
-                            {
-                                string body = new StreamReader(request.InputStream, request.ContentEncoding).ReadToEnd();
-                                var nv = HttpUtility.ParseQueryString(body);
-                                try
-                                {
-                                    using (var connection = new SqliteConnection(connStr))
-                                    {
-                                        connection.Open();
-                                        string birlesikOzellikler = string.Format("{0} | {1} | Pil: {2}", nv["v_gb"], nv["v_renk"], nv["v_pil"]);
-                                        string query = "INSERT INTO vitrin (marka, model, imei, alinma_tarihi, fiyat, satis_fiyati, durum, kutu_fatura, garanti) VALUES (@marka, @model, @imei, @alinma, @fiyat, @satis, @durum, @kutu, @garanti);";
-                                        using (var command = new SqliteCommand(query, connection))
-                                        {
-                                            command.Parameters.AddWithValue("@marka", birlesikOzellikler);
-                                            command.Parameters.AddWithValue("@model", nv["v_model"]);
-                                            command.Parameters.AddWithValue("@imei", nv["v_imei"]);
-                                            command.Parameters.AddWithValue("@alinma", DateTime.Now.ToString("dd.MM.yyyy"));
-                                            command.Parameters.AddWithValue("@fiyat", nv["v_alis"]);
-                                            command.Parameters.AddWithValue("@satis", nv["v_satis"]);
-                                            command.Parameters.AddWithValue("@durum", "VITRIN");
-                                            command.Parameters.AddWithValue("@kutu", nv["v_kutu"]);
-                                            command.Parameters.AddWithValue("@garanti", nv["v_garanti"]);
-                                            command.ExecuteNonQuery();
-                                        }
-                                    }
-                                    html = GetHeader("Ürün Eklendi", "/vitrin_panel", "Yeni Ürün Girdisi") +
-                                           "<div class='alert alert-ok'>Ürün dükkan vitrin envanterine başarıyla dahil edildi.</div>" +
-                                           "<a href='/vitrin_listele' class='action-btn btn-submit'>Vitrin Raflarını Gör</a>" +
-                                           Footer;
-                                }
-                                catch (Exception ex)
-                                {
-                                    html = GetHeader("Sistem Hatası", "/vitrin_panel", "Geri") +
-                                           "<div class='alert alert-err'>Stok veritabanına eklenemedi: " + ex.Message + "</div>" +
-                                           Footer;
-                                }
                             }
                             else if (rawUrl == "/vitrin_listele")
                             {
@@ -1010,11 +998,13 @@ namespace CalkanGsmWeb
                                                     sb.Append("</div>");
                                                     sb.Append("<div class='row-actions' style='margin-top:10px; padding-top:10px;'>");
                                                     sb.Append("<span style='font-size:12px; color:var(--green); font-weight:650;'>✓ TESLİM EDİLDİ</span>");
-                                                    sb.Append("<form action='/sil' method='POST' onsubmit=\"return confirm('Silmek istediginize emin misiniz?');\">");
+                                                    sb.Append("<div style='display:flex; gap:8px;'>");
+                                                    sb.AppendFormat("<a href='/duzenle?id={0}&tip=arsiv_tamir' class='action-btn btn-secondary' style='padding:6px 14px; font-size:12px;'>Tarih Düzelt</a>", r["id"]);
+                                                    sb.Append("<form action='/sil' method='POST' onsubmit=\"return confirm('Silmek istediginize emin misiniz?');\" style='margin:0;'>");
                                                     sb.AppendFormat("<input type='hidden' name='id' value='{0}'>", r["id"]);
                                                     sb.Append("<input type='hidden' name='git' value='arsiv'>");
                                                     sb.Append("<button type='submit' class='action-btn btn-danger' style='padding:6px 14px; font-size:12px;'>Kayıt Sil</button>");
-                                                    sb.Append("</form></div></div>");
+                                                    sb.Append("</form></div></div></div>");
                                                 }
                                             }
                                         }
@@ -1056,7 +1046,7 @@ namespace CalkanGsmWeb
                                                     sb.Append("</div>");
                                                     sb.Append("<div class='row-actions' style='margin-top:10px; padding-top:10px;'>");
                                                     sb.Append("<span style='font-size:12px; color:var(--accent); font-weight:650;'>💰 SATILDI</span>");
-                                                    sb.Append("<form action='/sil' method='POST' onsubmit=\"return confirm('Bu satış kaydını arşivden tamamen silmek istediğinize emin misiniz?');\">");
+                                                    sb.Append("<form action='/sil' method='POST' onsubmit=\"return confirm('Bu satış kaydını arşivden tamamen silmek istediğinize emin misiniz?');\" style='margin:0;'>");
                                                     sb.AppendFormat("<input type='hidden' name='id' value='{0}'>", r["id"]);
                                                     sb.Append("<input type='hidden' name='git' value='arsiv'>");
                                                     sb.Append("<button type='submit' class='action-btn btn-danger' style='padding:6px 14px; font-size:12px;'>Kayıt Sil</button>");
@@ -1324,11 +1314,10 @@ namespace CalkanGsmWeb
                     {
                         command.ExecuteNonQuery();
                     }
-                    // Eski DB'de kolon yoksa ekle (migration)
                     try {
                         using (var altCmd = new SqliteCommand("ALTER TABLE vitrin ADD COLUMN teslim_tarihi TEXT;", connection))
                             altCmd.ExecuteNonQuery();
-                    } catch { /* zaten varsa hata yok */ }
+                    } catch { }
                 }
             }
             catch (Exception ex) { Console.WriteLine("❌ Veritabanı Tablo Hatası: " + ex.Message); }
