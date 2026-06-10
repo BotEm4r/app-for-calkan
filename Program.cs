@@ -172,7 +172,7 @@ namespace CalkanGsmWeb
     --border:      #94a3b8;
     --text:        #0f172a;
     --muted:       #475569;
-    --accent:      #0284c7;
+    --accent: #0066cc;
     --green:       #16a34a;
     --whatsapp:    #16a34a;
     --red:         #dc2626;
@@ -422,9 +422,25 @@ namespace CalkanGsmWeb
   .btn-secondary { background: transparent; border: 1px solid var(--border); color: var(--text); }
   .btn-secondary:hover { background: var(--border); }
   
-  /* İSTEDİĞİN MAVİ OUTLINE TASARIMLI BUTON SILLERI */
-  .btn-outline-blue { background: transparent; border: 2px solid var(--accent); color: var(--accent); }
-  .btn-outline-blue:hover { background: rgba(56, 189, 248, 0.1); }
+  /* MAVİ OUTLINE BUTON STİLİ */
+  .btn-outline-blue { 
+    background: transparent; 
+    border: 2px solid #38bdf8; 
+    color: #38bdf8; 
+    font-weight: 700;
+    transition: all 0.2s ease-in-out;
+  }
+  .btn-outline-blue:hover { 
+    background: rgba(56, 189, 248, 0.15); 
+    box-shadow: 0 0 15px rgba(56, 189, 248, 0.3);
+  }
+  :root[data-theme='light'] .btn-outline-blue {
+    border-color: #0066cc;
+    color: #0066cc;
+  }
+  :root[data-theme='light'] .btn-outline-blue:hover {
+    background: rgba(0, 102, 204, 0.1);
+  }
   
   .btn-success { background: var(--green); color: #fff; }
   .btn-success:hover { opacity: 0.9; }
@@ -441,11 +457,11 @@ namespace CalkanGsmWeb
 
   .empty-state {
     text-align: center;
-    padding: 60px 20px;
+    padding: 40px 20px;
     color: var(--muted);
-    font-size: 14px;
+    font-size: 13px;
     border: 2px dashed var(--border);
-    border-radius: 16px;
+    border-radius: 14px;
   }
 
   .login-wrapper { min-height: 75vh; display: flex; align-items: center; justify-content: center; }
@@ -461,12 +477,14 @@ namespace CalkanGsmWeb
   .login-head { font-size: 22px; font-weight: 800; text-align: center; margin-bottom: 24px; letter-spacing: -0.02em; }
 
   .divider-title {
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 700;
     color: var(--accent);
     margin: 35px 0 15px;
     text-transform: uppercase;
     letter-spacing: 0.08em;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 6px;
   }
 
   .back-link { font-size: 14px; color: var(--muted); text-decoration: none; margin-bottom: 24px; display: inline-block; }
@@ -707,10 +725,14 @@ namespace CalkanGsmWeb
                                        "<button type='submit' class='action-btn btn-submit'>Sistemi Aç</button>" +
                                        "</form></div></div></div></body></html>";
                             }
-                            else if (rawUrl == "/" || rawUrl == "")
+                            else if (rawUrl.StartsWith("/") && (rawUrl == "/" || rawUrl.StartsWith("/?")))
                             {
                                 html = GetHeader() +
                                        "<div class='view-heading'><div class='view-title'>Mağaza Yönetim Tezgâhı</div><div class='view-sub'>Dükkan içi aktif tamirler ve vitrin envanter kontrolü.</div></div>" +
+                                       
+                                       // TAM İSTEDİĞİN KASANIN ÜSTÜNDEKİ MAVİ OUTLINE TASARIMLI KASA DEFTERİ BUTONU
+                                       "<a href='/kasa_defteri' class='action-btn btn-outline-blue' style='width:100%; margin-bottom:24px; justify-content:center; display:flex; font-size:15px; text-transform:uppercase; letter-spacing:0.03em; padding:15px;'>📒 Aksesuar Satış &amp; Kasa Defteri</a>" +
+
                                        "<div class='menu-layout'>" +
                                        "  <a href='/tamir_panel' class='menu-card'><span class='label'>Yeni Tamir Kaydı</span><span class='desc'>Müşteri bilgileri ve arıza durum kaydı oluşturun.</span></a>" +
                                        "  <a href='/vitrin_panel' class='menu-card'><span class='label'>Vitrine Ürün Ekle</span><span class='desc'>Satışa çıkarılacak yeni cihaz stok girişi yapın.</span></a>" +
@@ -719,127 +741,232 @@ namespace CalkanGsmWeb
                                        "  <a href='/arsiv_panel' class='menu-card menu-full'><span class='label'>Geçmiş İşlemler Arşivi</span><span class='desc'>Tamamlanıp teslim edilmiş tamirler ve satılmış eski cihazların dökümü.</span></a>" +
                                        "</div>" +
                                        
-                                       // ARADIĞIN MAVİ OUTLINE TASARIMLI KASA DEFTERİ BUTONU
-                                       "<a href='/kasa_defteri' class='action-btn btn-outline-blue' style='width:100%; margin-top:24px; justify-content:center; display:flex; font-size:15px;'>📒 Aksesuar Satış &amp; Kasa Defteri</a>" +
-                                       
-                                       (aktifKullanici == "admin" ? "<a href='/yedek' class='action-btn btn-secondary' style='width:100%;margin-top:16px;justify-content:center;display:flex;'>💾 Veritabanı Yedeği İndir</a>" : "") +
+                                       (aktifKullanici == "admin" ? "<a href='/yedek' class='action-btn btn-secondary' style='width:100%;margin-top:24px;justify-content:center;display:flex;'>💾 Veritabanı Yedeği İndir</a>" : "") +
                                        "<a href='/logout' class='action-btn btn-close-shop'>Güvenli Çıkış (Oturumu Kapat)</a>" +
                                        Footer;
                             }
                             
-                            // ── YENİ: KASA DEFTERİ VE AKSESUAR SATIŞ MODÜLÜ GERÇEKLEŞTİRİMİ ──────────────────
-                            else if (rawUrl == "/kasa_defteri")
+                            // ── YENİ: GELİŞMİŞ TARİHLİ VE ÖDEME SEÇENEKLİ KASA DEFTERİ MODÜLÜ ──────────────────
+                            else if (rawUrl.StartsWith("/kasa_defteri"))
                             {
-                                var sb = new StringBuilder();
-                                sb.Append(GetHeader("Aksesuar Satış &amp; Kasa Defteri", "/", "Ana Menü"));
+                                var qs = HttpUtility.ParseQueryString(rawUrl.Contains("?") ? rawUrl.Substring(rawUrl.IndexOf('?') + 1) : "");
                                 
+                                // Varsayılan filtre tarihi bugündür
+                                string filtreTarihiInput = qs["tarih"] ?? DateTime.Now.ToString("yyyy-MM-dd");
+                                DateTime seçiliFiltreGünü = DateTime.Now;
+                                DateTime.TryParse(filtreTarihiInput, out seçiliFiltreGünü);
+                                string aranacakSqlTarihKalıbı = seçiliFiltreGünü.ToString("dd.MM.yyyy");
+
+                                var sb = new StringBuilder();
+                                sb.Append(GetHeader("Kasa Defteri &amp; Aksesuar", "/", "Ana Menü"));
+                                
+                                // ESKİ GÜNLERE BAKMA VE TARİH FİLTRELEME ALANI
+                                sb.Append("<div class='form-box' style='margin-bottom:24px; padding:20px; border-color:var(--accent);'>");
+                                sb.Append("<form method='GET' action='/kasa_defteri' id='tarihForm'>");
+                                sb.Append("<div class='form-field' style='margin-bottom:0; display:flex; align-items:center; gap:12px;'>");
+                                sb.Append("<label style='margin-bottom:0; white-space:nowrap; font-size:14px; color:var(--text);'>📆 İncelemek İstediğiniz Gün:</label>");
+                                sb.AppendFormat("<input type='date' name='tarih' value='{0}' class='form-input' style='padding:10px;' onchange='document.getElementById(\"tarihForm\").submit();'>", filtreTarihiInput);
+                                sb.Append("</div>");
+                                sb.Append("</form></div>");
+                                
+                                // GELİR / GİDER / DEVİR EKLEME FORMU
                                 sb.Append("<div class='form-box' style='margin-bottom:24px;'>");
+                                sb.Append("<h3 style='margin-bottom:15px; font-size:16px; font-weight:700;'>➕ Yeni Kasa İşlemi Ekle</h3>");
                                 sb.Append("<form action='/kasa_ekle' method='POST'>");
-                                sb.Append("<div class='form-field'><label>Ürün / İşlem Açıklaması</label><input type='text' name='k_aciklama' class='form-input' placeholder='Örn: Kılıf Satışı, Kırılmaz Cam, Çay Masrafı' required autocomplete='off'></div>");
-                                sb.Append("<div class='form-field'><label>İşlem Tipi</label><select name='k_tip' class='form-input'><option value='GELİR'>➕ Gelir (Aksesuar Satışı / Nakit Giriş)</option><option value='GİDER'>➖ Gider (Dükkan Masrafı / Ödeme)</option></select></div>");
-                                sb.Append("<div class='form-field'><label>Tutar (TL)</label><input type='text' name='k_tutar' class='form-input' placeholder='Örn: 150' required autocomplete='off'></div>");
-                                sb.Append("<button type='submit' class='action-btn btn-submit' style='background:var(--accent);'>Kasaya İşle</button>");
+                                sb.AppendFormat("<input type='hidden' name='k_filtre_tarih' value='{0}'>", filtreTarihiInput);
+                                
+                                sb.Append("<div class='form-field'><label>Ürün / İşlem Açıklaması</label><input type='text' name='k_aciklama' class='form-input' placeholder='Örn: iPhone 11 Kılıf, Kırılmaz Cam, Çay Masrafı, Sabit Devir' required autocomplete='off'></div>");
+                                
+                                sb.Append("<div class='form-field'><label>İşlem Tipi</label><select name='k_tip' class='form-input'>");
+                                sb.Append("<option value='GELİR'>➕ Gelir (Satış / Nakit Girişi)</option>");
+                                sb.Append("<option value='GİDER'>➖ Gider (Dükkan Masrafı / Ödeme)</option>");
+                                sb.Append("<option value='KASA DEVİR'>📒 Kasa Devri (Dünden Kalan / Yarına Aktarılan)</option>");
+                                sb.Append("</select></div>");
+
+                                sb.Append("<div class='form-field'><label>Ödeme Türü</label><select name='k_odeme_tipi' class='form-input'>");
+                                sb.Append("<option value='NAKİT'>💵 Nakit</option>");
+                                sb.Append("<option value='VİSA'>💳 Visa / Kredi Kartı</option>");
+                                sb.Append("</select></div>");
+
+                                sb.Append("<div class='form-field'><label>Tutar (TL)</label><input type='text' name='k_tutar' class='form-input' placeholder='Örn: 250' required autocomplete='off'></div>");
+                                
+                                // BU SAYEDE İSTERSE YARININ TARİHİNİ SEÇİP DEVİR YAZABİLİR
+                                sb.AppendFormat("<div class='form-field'><label>İşleme Yazılacak Tarih</label><input type='date' name='k_kayit_tarih' value='{0}' class='form-input'></div>", filtreTarihiInput);
+                                
+                                sb.Append("<button type='submit' class='action-btn btn-submit'>Kayıt İşle</button>");
                                 sb.Append("</form></div>");
 
-                                double toplamGelir = 0;
-                                double toplamGider = 0;
-                                var listeSb = new StringBuilder();
+                                // MATEMATİKSEL DEĞİŞKENLER (NAKİT VE VİSA AYRIMI)
+                                double nakitGelir = 0, visaGelir = 0;
+                                double nakitGider = 0, visaGider = 0;
+                                double nakitDevir = 0, visaDevir = 0;
+
+                                var gelirSb = new StringBuilder();
+                                var giderSb = new StringBuilder();
 
                                 try
                                 {
                                     using (var connection = new SqliteConnection(connStr))
                                     {
                                         connection.Open();
-                                        using (var cmd = new SqliteCommand("SELECT * FROM kasa ORDER BY id DESC;", connection))
-                                        using (var r = cmd.ExecuteReader())
+                                        using (var cmd = new SqliteCommand("SELECT * FROM kasa WHERE tarih LIKE @gun ORDER BY id DESC;", connection))
                                         {
-                                            while (r.Read())
+                                            cmd.Parameters.AddWithValue("@gun", aranacakSqlTarihKalıbı + "%");
+                                            using (var r = cmd.ExecuteReader())
                                             {
-                                                string id = r["id"].ToString() ?? "";
-                                                string aciklama = r["aciklama"].ToString() ?? "";
-                                                string tip = r["tip"].ToString() ?? "GELİR";
-                                                string tutarStr = r["tutar"].ToString() ?? "0";
-                                                double.TryParse(tutarStr, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double tutar);
-                                                string tarih = r["tarih"].ToString() ?? "";
+                                                while (r.Read())
+                                                {
+                                                    string id = r["id"].ToString() ?? "";
+                                                    string aciklama = r["aciklama"].ToString() ?? "";
+                                                    string tip = r["tip"].ToString() ?? "GELİR";
+                                                    string odemeTipi = r["odeme_tipi"].ToString() ?? "NAKİT";
+                                                    string tutarStr = r["tutar"].ToString() ?? "0";
+                                                    double.TryParse(tutarStr, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double tutar);
+                                                    string tamTarih = r["tarih"].ToString() ?? "";
+                                                    string saat = tamTarih.Length > 10 ? tamTarih.Substring(11) : "";
 
-                                                if (tip == "GELİR") toplamGelir += tutar;
-                                                else toplamGider += tutar;
+                                                    // Hesaplama ve Ayrıştırma mantığı
+                                                    if (tip == "GİDER")
+                                                    {
+                                                        if (odemeTipi == "VİSA") visaGider += tutar; else nakitGider += tutar;
+                                                    }
+                                                    else if (tip == "KASA DEVİR")
+                                                    {
+                                                        if (odemeTipi == "VİSA") visaDevir += tutar; else nakitDevir += tutar;
+                                                    }
+                                                    else // GELİR
+                                                    {
+                                                        if (odemeTipi == "VİSA") visaGelir += tutar; else nakitGelir += tutar;
+                                                    }
 
-                                                string renk = tip == "GELİR" ? "var(--green)" : "var(--red)";
-                                                string isaret = tip == "GELİR" ? "+" : "-";
+                                                    // HTML Tasarımı oluşturma
+                                                    var itemRow = new StringBuilder();
+                                                    string tipRenk = tip == "GELİR" ? "var(--green)" : (tip == "GİDER" ? "var(--red)" : "var(--accent)");
+                                                    string isaret = tip == "GİDER" ? "-" : "+";
+                                                    string odemeRozeti = odemeTipi == "VİSA" ? "💳 VİSA" : "💵 NAKİT";
 
-                                                listeSb.Append("<div class='shop-row' style='padding:18px; margin-bottom:12px;'>");
-                                                listeSb.Append("<div class='row-header' style='margin-bottom:0; align-items:center;'>");
-                                                listeSb.AppendFormat("<div><strong style='color:{0}; font-size:13px;'>[{1}]</strong> <span style='font-weight:600; margin-left:5px;'>{2}</span><br><span style='font-size:11px; color:var(--muted);'>{3}</span></div>", renk, tip, System.Web.HttpUtility.HtmlEncode(aciklama), tarih);
-                                                listeSb.AppendFormat("<div style='font-family:\"JetBrains Mono\",monospace; font-size:16px; font-weight:700; color:{0};'>{1}{2} TL</div>", renk, isaret, tutar);
-                                                listeSb.Append("</div>");
-                                                listeSb.Append("<div style='display:flex; justify-content:flex-end; margin-top:8px; border-top:1px solid var(--border); padding-top:8px;'>");
-                                                listeSb.Append("<form action='/kasa_sil' method='POST' style='margin:0;' onsubmit=\"return confirm('Bu işlemi iptal etmek (silmek) istediğinize emin misiniz?');\">");
-                                                listeSb.AppendFormat("<input type='hidden' name='id' value='{0}'>", id);
-                                                listeSb.Append("<button type='submit' class='action-btn btn-danger' style='padding:4px 12px; font-size:11px; border-radius:6px;'>Kayıt İptal</button>");
-                                                listeSb.Append("</form></div>");
-                                                listeSb.Append("</div>");
+                                                    itemRow.Append("<div class='shop-row' style='padding:14px; margin-bottom:10px;'>");
+                                                    itemRow.Append("<div class='row-header' style='margin-bottom:0; align-items:center;'>");
+                                                    itemRow.AppendFormat("<div><span class='tag' style='color:{0}; border-color:{0}; padding:2px 6px; font-size:10px; font-weight:700;'>{1}</span> ", tipRenk, tip);
+                                                    itemRow.AppendFormat("<span class='tag' style='color:var(--muted); padding:2px 6px; font-size:10px;'>{0}</span>", odemeRozeti);
+                                                    itemRow.AppendFormat("<br><span style='font-weight:600; font-size:14px; display:inline-block; margin-top:6px;'>{0}</span>", System.Web.HttpUtility.HtmlEncode(aciklama));
+                                                    itemRow.AppendFormat("<br><span style='font-size:11px; color:var(--muted);'>🕒 Saat: {0}</span></div>", saat);
+                                                    itemRow.AppendFormat("<div style='font-family:\"JetBrains Mono\",monospace; font-size:15px; font-weight:700; color:{0};'>{1}{2} TL</div>", tipRenk, isaret, tutar);
+                                                    itemRow.Append("</div>");
+                                                    
+                                                    itemRow.Append("<div style='display:flex; justify-content:flex-end; margin-top:6px; border-top:1px dashed var(--border); padding-top:6px;'>");
+                                                    itemRow.AppendFormat("<form action='/kasa_sil' method='POST' style='margin:0;' onsubmit=\"return confirm('{0} işlemini iptal etmek istiyor musunuz?');\">", System.Web.HttpUtility.HtmlEncode(aciklama));
+                                                    itemRow.AppendFormat("<input type='hidden' name='id' value='{0}'>", id);
+                                                    itemRow.AppendFormat("<input type='hidden' name='k_filtre_tarih' value='{0}'>", filtreTarihiInput);
+                                                    itemRow.Append("<button type='submit' class='action-btn btn-danger' style='padding:3px 8px; font-size:10px; border-radius:5px;'>Sil</button>");
+                                                    itemRow.Append("</form></div>");
+                                                    itemRow.Append("</div>");
+
+                                                    if (tip == "GİDER")
+                                                        giderSb.Append(itemRow.ToString());
+                                                    else
+                                                        gelirSb.Append(itemRow.ToString());
+                                                }
                                             }
                                         }
                                     }
                                 }
-                                catch (Exception ex) { sb.AppendFormat("<div class='alert alert-err'>Hata: {0}</div>", ex.Message); }
+                                catch (Exception ex) { sb.AppendFormat("<div class='alert alert-err'>Veritabanı Hatası: {0}</div>", ex.Message); }
 
-                                double netKasa = toplamGelir - toplamGider;
-                                string netRenk = netKasa >= 0 ? "var(--green)" : "var(--red)";
+                                // KASA DEFTERİ MATEMATİK HESAPLARI
+                                double toplamGelirVeDevir = nakitGelir + visaGelir + nakitDevir + visaDevir;
+                                double toplamGider = nakitGider + visaGider;
+                                
+                                double netNakitKasa = nakitGelir + nakitDevir - nakitGider;
+                                double netVisaKasa = visaGelir + visaDevir - visaGider;
+                                double genelNetKasa = netNakitKasa + netVisaKasa;
 
-                                sb.Append("<div style='display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:25px;'>");
-                                sb.AppendFormat("<div style='background:var(--surface); border:1px solid var(--border); padding:14px; border-radius:12px; text-align:center;'><span style='font-size:11px; color:var(--muted); font-weight:700;'>TOPLAM GELİR</span><br><strong style='color:var(--green); font-family:\"JetBrains Mono\",monospace; font-size:15px;'>+{0} TL</strong></div>", toplamGelir);
-                                sb.AppendFormat("<div style='background:var(--surface); border:1px solid var(--border); padding:14px; border-radius:12px; text-align:center;'><span style='font-size:11px; color:var(--muted); font-weight:700;'>TOPLAM GİDER</span><br><strong style='color:var(--red); font-family:\"JetBrains Mono\",monospace; font-size:15px;'>-{0} TL</strong></div>", toplamGider);
-                                sb.AppendFormat("<div style='background:var(--surface); border:1px solid var(--border); padding:14px; border-radius:12px; text-align:center;'><span style='font-size:11px; color:var(--muted); font-weight:700;'>NET KASA durumu</span><br><strong style='color:{1}; font-family:\"JetBrains Mono\",monospace; font-size:15px;'>{0} TL</strong></div>", netKasa, netRenk);
+                                string nakitRenk = netNakitKasa >= 0 ? "var(--green)" : "var(--red)";
+                                string visaRenk = netVisaKasa >= 0 ? "var(--accent)" : "var(--red)";
+                                string genelRenk = genelNetKasa >= 0 ? "var(--green)" : "var(--red)";
+
+                                // DÜKKAN GÜNLÜK ÖZET TABLOSU
+                                sb.Append("<div style='display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:15px;'>");
+                                sb.AppendFormat("<div style='background:var(--surface); border:1px solid var(--border); padding:12px; border-radius:12px; text-align:center;'><span style='font-size:11px; color:var(--muted); font-weight:700;'>💵 NAKİT ÇEKMECESİ</span><br><strong style='color:{1}; font-family:\"JetBrains Mono\",monospace; font-size:16px;'>{0} TL</strong></div>", netNakitKasa, nakitRenk);
+                                sb.AppendFormat("<div style='background:var(--surface); border:1px solid var(--border); padding:12px; border-radius:12px; text-align:center;'><span style='font-size:11px; color:var(--muted); font-weight:700;'>💳 VİSA (BANKA POS)</span><br><strong style='color:{1}; font-family:\"JetBrains Mono\",monospace; font-size:16px;'>{0} TL</strong></div>", netVisaKasa, visaRenk);
                                 sb.Append("</div>");
+                                
+                                sb.AppendFormat("<div style='background:var(--surface); border:2px solid var(--border); padding:14px; border-radius:12px; text-align:center; margin-bottom:30px;'><span style='font-size:12px; color:var(--text); font-weight:700;'>📈 BU GÜNÜN GENEL NET DURUMU</span><br><strong style='color:{1}; font-family:\"JetBrains Mono\",monospace; font-size:20px;'>{0} TL</strong></div>", genelNetKasa, genelRenk);
 
-                                if (listeSb.Length == 0)
-                                    sb.Append("<div class='empty-state'>Kasa defterinde henüz kayıtlı işlem bulunmuyor.</div>");
+                                // AYRILMIŞ LİSTELER
+                                sb.Append("<div class='divider-title'>🟢 GELİRLER &amp; KASA DEVİRLERİ LİSTESİ</div>");
+                                if (gelirSb.Length == 0)
+                                    sb.Append("<div class='empty-state' style='margin-bottom:25px;'>Bu güne ait kayıtlı gelir veya devir bulunmuyor.</div>");
                                 else
-                                    sb.Append(listeSb.ToString());
+                                    sb.Append(gelirSb.ToString());
+
+                                sb.Append("<div class='divider-title'>🔴 GİDERLER &amp; DÜKKAN MASRAFLARI LİSTESİ</div>");
+                                if (giderSb.Length == 0)
+                                    sb.Append("<div class='empty-state'>Bu güne ait kayıtlı dükkan gideri bulunmuyor.</div>");
+                                else
+                                    sb.Append(giderSb.ToString());
 
                                 sb.Append(Footer);
                                 html = sb.ToString();
                             }
-                            else if (rawUrl == "/kasa_ekle" && method == "POST")
+                            else if (rawUrl.StartsWith("/kasa_ekle") && method == "POST")
                             {
                                 string body = new StreamReader(request.InputStream, request.ContentEncoding).ReadToEnd();
                                 var nv = HttpUtility.ParseQueryString(body);
-                                string aciklama = nv["k_aciklama"] ?? "Aksesuar Satışı";
+                                
+                                string geriTarih = nv["k_filtre_tarih"] ?? DateTime.Now.ToString("yyyy-MM-dd");
+                                string aciklama = nv["k_aciklama"] ?? "Aksesuar İşlemi";
                                 string tip = nv["k_tip"] ?? "GELİR";
+                                string odemeTipi = nv["k_odeme_tipi"] ?? "NAKİT";
                                 string tutarStr = nv["k_tutar"] ?? "0";
                                 double.TryParse(tutarStr.Replace(",", "."), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double tutar);
+
+                                // Kullanıcının seçtiği tarihi al, eğer seçmediyse bugünü ver
+                                string secilenTarihInput = nv["k_kayit_tarih"] ?? "";
+                                string veritabanıTarihKayıt = "";
+                                
+                                if (DateTime.TryParse(secilenTarihInput, out DateTime cTarih))
+                                {
+                                    veritabanıTarihKayıt = cTarih.ToString("dd.MM.yyyy") + " " + DateTime.Now.ToString("HH:mm");
+                                    // Yönlendirmeyi de eklenen güne yap ki kullanıcı eklediği kaydı görsün
+                                    geriTarih = secilenTarihInput;
+                                }
+                                else
+                                {
+                                    veritabanıTarihKayıt = DateTime.Now.ToString("dd.MM.yyyy HH:mm");
+                                }
 
                                 try
                                 {
                                     using (var connection = new SqliteConnection(connStr))
                                     {
                                         connection.Open();
-                                        using (var cmd = new SqliteCommand("INSERT INTO kasa (aciklama, tip, tutar, tarih) VALUES (@aciklama, @tip, @tutar, @tarih);", connection))
+                                        using (var cmd = new SqliteCommand("INSERT INTO kasa (aciklama, tip, tutar, tarih, odeme_tipi) VALUES (@aciklama, @tip, @tutar, @tarih, @odeme_tipi);", connection))
                                         {
                                             cmd.Parameters.AddWithValue("@aciklama", aciklama);
                                             cmd.Parameters.AddWithValue("@tip", tip);
                                             cmd.Parameters.AddWithValue("@tutar", tutar);
-                                            cmd.Parameters.AddWithValue("@tarih", DateTime.Now.ToString("dd.MM.yyyy HH:mm"));
+                                            cmd.Parameters.AddWithValue("@tarih", veritabanıTarihKayıt);
+                                            cmd.Parameters.AddWithValue("@odeme_tipi", odemeTipi);
                                             cmd.ExecuteNonQuery();
                                         }
                                     }
                                     response.StatusCode = 302;
-                                    response.Headers.Add("Location", "/kasa_defteri");
+                                    response.Headers.Add("Location", "/kasa_defteri?tarih=" + geriTarih);
                                     response.OutputStream.Close();
                                     return;
                                 }
                                 catch (Exception ex)
                                 {
-                                    html = GetHeader("Hata", "/kasa_defteri", "Geri") + $"<div class='alert alert-err'>{ex.Message}</div>" + Footer;
+                                    html = GetHeader("Kasa Hatası", "/kasa_defteri", "Geri") + $"<div class='alert alert-err'>{ex.Message}</div>" + Footer;
                                 }
                             }
-                            else if (rawUrl == "/kasa_sil" && method == "POST")
+                            else if (rawUrl.StartsWith("/kasa_sil") && method == "POST")
                             {
                                 string body = new StreamReader(request.InputStream).ReadToEnd();
                                 var nv = HttpUtility.ParseQueryString(body);
                                 string id = nv["id"];
+                                string geriTarih = nv["k_filtre_tarih"] ?? DateTime.Now.ToString("yyyy-MM-dd");
 
                                 try
                                 {
@@ -856,7 +983,7 @@ namespace CalkanGsmWeb
                                 catch { }
 
                                 response.StatusCode = 302;
-                                response.Headers.Add("Location", "/kasa_defteri");
+                                response.Headers.Add("Location", "/kasa_defteri?tarih=" + geriTarih);
                                 response.OutputStream.Close();
                                 return;
                             }
@@ -1452,11 +1579,15 @@ namespace CalkanGsmWeb
                             altCmd.ExecuteNonQuery();
                     } catch { }
 
-                    // KASA DEFTERİ İÇİN YENİ SQLITE TABLOSU
-                    using (var commandKasa = new SqliteCommand("CREATE TABLE IF NOT EXISTS kasa (id INTEGER PRIMARY KEY AUTOINCREMENT, aciklama TEXT, tip TEXT, tutar REAL, tarih TEXT);", connection))
+                    // KASA DEFTERİ TABLOSUNUN GÜNCELLENMESİ VE ÖDEME TİPİ KOLONUNUN GÜVENLİCE EKLENMESİ
+                    using (var commandKasa = new SqliteCommand("CREATE TABLE IF NOT EXISTS kasa (id INTEGER PRIMARY KEY AUTOINCREMENT, aciklama TEXT, tip TEXT, tutar REAL, tarih TEXT, odeme_tipi TEXT);", connection))
                     {
                         commandKasa.ExecuteNonQuery();
                     }
+                    try {
+                        using (var altCmdKasa = new SqliteCommand("ALTER TABLE kasa ADD COLUMN odeme_tipi TEXT;", connection))
+                            altCmdKasa.ExecuteNonQuery();
+                    } catch { }
                 }
             }
             catch (Exception ex) { Console.WriteLine("❌ Veritabanı Tablo Hatası: " + ex.Message); }
